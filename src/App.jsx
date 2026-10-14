@@ -17,11 +17,13 @@ import { CheckSquare, BarChart2, Plus } from 'lucide-react';
 export default function App() {
   const [routines, setRoutines] = useState([]);
   const [completedMap, setCompletedMap] = useState({});
+  const [quantityMap, setQuantityMap] = useState({});
   const [currentScore, setCurrentScore] = useState(0);
   const [targetScore, setTargetScore] = useState(100);
   const [resetHour, setResetHour] = useState(4); // 04:00 Night Owl default
   const [todayStr, setTodayStr] = useState(getTodayString(4));
   const [daysMap, setDaysMap] = useState({});
+  const [categoryScoresMap, setCategoryScoresMap] = useState({});
   const [streak, setStreak] = useState(0);
   const [freezeUsed, setFreezeUsed] = useState(false);
 
@@ -36,13 +38,15 @@ export default function App() {
   const [todayTereaSticks, setTodayTereaSticks] = useState(0);
   const [soundEnabled, setSoundEnabled] = useState(true);
 
+  // Privacy Shield (Blur Mode)
+  const [privacyMode, setPrivacyMode] = useState(false);
+
   // UI Navigation & Modals
   const [currentView, setCurrentView] = useState('routines'); // 'routines' | 'tracker'
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isBadgesModalOpen, setIsBadgesModalOpen] = useState(false);
   const [selectedDay, setSelectedDay] = useState(null);
-
 
   // Load all data from IndexedDB
   const loadData = useCallback(async () => {
@@ -89,12 +93,17 @@ export default function App() {
     // Load Today's Completed Routine Logs
     const todayLogs = await db.logs.where('date').equals(currentToday).toArray();
     const map = {};
+    const qMap = {};
     let score = 0;
     todayLogs.forEach((log) => {
       map[log.routineId] = true;
       score += log.weight || 0;
+      if (log.currentQuantity !== undefined) {
+        qMap[log.routineId] = log.currentQuantity;
+      }
     });
     setCompletedMap(map);
+    setQuantityMap((prev) => ({ ...prev, ...qMap }));
     setCurrentScore(score);
 
     // Load Today's Terea Sticks
@@ -118,6 +127,23 @@ export default function App() {
       note: dMap[currentToday]?.note || ''
     };
     setDaysMap(dMap);
+
+    // Compute Category Breakdown Map for Heatmap
+    const allLogs = await db.logs.toArray();
+    const routinesMap = {};
+    activeRoutines.forEach((r) => {
+      routinesMap[r.id] = r;
+    });
+
+    const catMap = {};
+    allLogs.forEach((log) => {
+      const d = log.date;
+      if (!catMap[d]) catMap[d] = {};
+      const r = routinesMap[log.routineId];
+      const cat = r?.category || 'study';
+      catMap[d][cat] = (catMap[d][cat] || 0) + (log.weight || 0);
+    });
+    setCategoryScoresMap(catMap);
 
     // Calculate Streaks with Flexible Discipline
     const streakInfo = calculateStreaks(dMap, 80, resetVal);
@@ -188,19 +214,27 @@ export default function App() {
 
     let newScore = currentScore;
     const newMap = { ...completedMap };
+    const isQty = routine.type === 'quantity' || (routine.targetQuantity && routine.unit);
+    const targetQ = Number(routine.targetQuantity) || 1;
 
     if (!isCompleted) {
       // Mark Completed
+      const qtyToSet = isQty ? targetQ : undefined;
       await db.logs.put({
         id: logId,
         date: todayStr,
         routineId: routine.id,
         title: routine.title,
         weight: routine.weight,
+        currentQuantity: qtyToSet,
         completedAt: new Date().toISOString()
       });
       newMap[routine.id] = true;
       newScore += routine.weight;
+
+      if (isQty) {
+        setQuantityMap((prev) => ({ ...prev, [routine.id]: targetQ }));
+      }
 
       // Celebrate 100 Score with Apple-like micro confetti
       if (newScore >= targetScore && currentScore < targetScore) {
@@ -216,6 +250,10 @@ export default function App() {
       await db.logs.delete(logId);
       delete newMap[routine.id];
       newScore = Math.max(0, newScore - routine.weight);
+
+      if (isQty) {
+        setQuantityMap((prev) => ({ ...prev, [routine.id]: 0 }));
+      }
     }
 
     setCompletedMap(newMap);
@@ -247,6 +285,162 @@ export default function App() {
     const streakInfo = calculateStreaks(updatedMap, 80, resetHour);
     setStreak(streakInfo.currentStreak);
     setFreezeUsed(streakInfo.freezeUsed);
+
+    // Update category map in memory
+    const cat = routine.category || 'study';
+    setCategoryScoresMap((prev) => {
+      const dayCats = { ...(prev[todayStr] || {}) };
+      const currentCatScore = dayCats[cat] || 0;
+      dayCats[cat] = !isCompleted
+        ? currentCatScore + routine.weight
+        : Math.max(0, currentCatScore - routine.weight);
+      return { ...prev, [todayStr]: dayCats };
+    });
+  };
+
+  // Update quantity habit progress
+  const handleUpdateQuantity = async (routine, newQty) => {
+    setQuantityMap((prev) => ({ ...prev, [routine.id]: newQty }));
+    const logId = `${todayStr}_${routine.id}`;
+    const targetQ = Number(routine.targetQuantity) || 1;
+    const isCompleted = !!completedMap[routine.id];
+
+    if (newQty >= targetQ && !isCompleted) {
+      // Auto-complete routine
+      if (soundEnabled) playClickSound();
+      await db.logs.put({
+        id: logId,
+        date: todayStr,
+        routineId: routine.id,
+        title: routine.title,
+        weight: routine.weight,
+        currentQuantity: newQty,
+        completedAt: new Date().toISOString()
+      });
+
+      const newScore = currentScore + routine.weight;
+      const newMap = { ...completedMap, [routine.id]: true };
+      setCompletedMap(newMap);
+      setCurrentScore(newScore);
+
+      if (newScore >= targetScore && currentScore < targetScore) {
+        confetti({
+          particleCount: 50,
+          spread: 60,
+          origin: { y: 0.8 },
+          colors: ['#10b981', '#34d399', '#6ee7b7', '#ffffff']
+        });
+      }
+
+      await db.days.put({
+        date: todayStr,
+        totalScore: newScore,
+        targetScore,
+        completedCount: Object.keys(newMap).length,
+        tereaCount: todayTereaSticks,
+        note: daysMap[todayStr]?.note || ''
+      });
+
+      const updatedMap = {
+        ...daysMap,
+        [todayStr]: {
+          date: todayStr,
+          totalScore: newScore,
+          targetScore,
+          completedCount: Object.keys(newMap).length,
+          tereaCount: todayTereaSticks,
+          note: daysMap[todayStr]?.note || ''
+        }
+      };
+      setDaysMap(updatedMap);
+      const streakInfo = calculateStreaks(updatedMap, 80, resetHour);
+      setStreak(streakInfo.currentStreak);
+      setFreezeUsed(streakInfo.freezeUsed);
+
+      const cat = routine.category || 'study';
+      setCategoryScoresMap((prev) => {
+        const dayCats = { ...(prev[todayStr] || {}) };
+        dayCats[cat] = (dayCats[cat] || 0) + routine.weight;
+        return { ...prev, [todayStr]: dayCats };
+      });
+    } else if (newQty < targetQ && isCompleted) {
+      // Un-complete routine
+      await db.logs.delete(logId);
+      const newScore = Math.max(0, currentScore - routine.weight);
+      const newMap = { ...completedMap };
+      delete newMap[routine.id];
+      setCompletedMap(newMap);
+      setCurrentScore(newScore);
+
+      await db.days.put({
+        date: todayStr,
+        totalScore: newScore,
+        targetScore,
+        completedCount: Object.keys(newMap).length,
+        tereaCount: todayTereaSticks,
+        note: daysMap[todayStr]?.note || ''
+      });
+
+      const updatedMap = {
+        ...daysMap,
+        [todayStr]: {
+          date: todayStr,
+          totalScore: newScore,
+          targetScore,
+          completedCount: Object.keys(newMap).length,
+          tereaCount: todayTereaSticks,
+          note: daysMap[todayStr]?.note || ''
+        }
+      };
+      setDaysMap(updatedMap);
+      const streakInfo = calculateStreaks(updatedMap, 80, resetHour);
+      setStreak(streakInfo.currentStreak);
+      setFreezeUsed(streakInfo.freezeUsed);
+
+      const cat = routine.category || 'study';
+      setCategoryScoresMap((prev) => {
+        const dayCats = { ...(prev[todayStr] || {}) };
+        dayCats[cat] = Math.max(0, (dayCats[cat] || 0) - routine.weight);
+        return { ...prev, [todayStr]: dayCats };
+      });
+    } else if (isCompleted) {
+      // Update quantity on existing log
+      await db.logs.update(logId, { currentQuantity: newQty });
+    }
+  };
+
+  // Toggle MIT star
+  const handleToggleMit = async (routine) => {
+    const nextMit = !routine.isMit;
+    await db.routines.update(routine.id, { isMit: nextMit });
+    setRoutines((prev) =>
+      prev.map((r) => (r.id === routine.id ? { ...r, isMit: nextMit } : r))
+    );
+  };
+
+  // Toggle routine freeze
+  const handleToggleFreeze = async (routine) => {
+    const nextFreeze = !routine.isFrozen;
+    await db.routines.update(routine.id, { isFrozen: nextFreeze });
+    setRoutines((prev) =>
+      prev.map((r) => (r.id === routine.id ? { ...r, isFrozen: nextFreeze } : r))
+    );
+  };
+
+  // Toggle subtask in checklist
+  const handleToggleSubtask = async (routine, subtaskId) => {
+    const updatedSubtasks = (routine.subtasks || []).map((st) =>
+      st.id === subtaskId ? { ...st, done: !st.done } : st
+    );
+    await db.routines.update(routine.id, { subtasks: updatedSubtasks });
+    setRoutines((prev) =>
+      prev.map((r) => (r.id === routine.id ? { ...r, subtasks: updatedSubtasks } : r))
+    );
+
+    const allDone = updatedSubtasks.length > 0 && updatedSubtasks.every((st) => st.done);
+    if (allDone && !completedMap[routine.id]) {
+      handleToggleRoutine(routine);
+    }
   };
 
   // Terea Increment (+)
@@ -423,7 +617,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0f1014] text-[#f1f2f6] flex flex-col font-sans selection:bg-neutral-800">
+    <div className={`min-h-screen bg-[#0f1014] text-[#f1f2f6] flex flex-col font-sans selection:bg-neutral-800 ${privacyMode ? 'privacy-active' : ''}`}>
       {/* Top Header */}
       <Header
         todayStr={todayStr}
@@ -433,6 +627,8 @@ export default function App() {
         freezeUsed={freezeUsed}
         todayTereaSticks={todayTereaSticks}
         tereaPrice={tereaPrice}
+        privacyMode={privacyMode}
+        onTogglePrivacy={() => setPrivacyMode((p) => !p)}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
         onOpenBadges={() => setIsBadgesModalOpen(true)}
         onToggleView={() => setCurrentView((v) => (v === 'routines' ? 'tracker' : 'routines'))}
@@ -453,13 +649,18 @@ export default function App() {
               onOpenSettings={() => setIsSettingsModalOpen(true)}
             />
 
-            {/* Routine & To-Do List with Dual Filters */}
+            {/* Routine & To-Do List with Dual Filters & Eisenhower Matrix */}
             <RoutineList
               routines={routines}
               completedMap={completedMap}
+              quantityMap={quantityMap}
               onToggleRoutine={handleToggleRoutine}
               onDeleteRoutine={handleDeleteRoutine}
               onOpenAddModal={() => setIsAddModalOpen(true)}
+              onUpdateQuantity={handleUpdateQuantity}
+              onToggleMit={handleToggleMit}
+              onToggleFreeze={handleToggleFreeze}
+              onToggleSubtask={handleToggleSubtask}
             />
           </>
         ) : (
@@ -468,6 +669,7 @@ export default function App() {
             todayStr={todayStr}
             targetScore={targetScore}
             tereaPrice={tereaPrice}
+            categoryScoresMap={categoryScoresMap}
             onSelectDay={(date) => setSelectedDay(date)}
             onSeedDemoData={handleSeedDemoData}
           />
@@ -513,6 +715,7 @@ export default function App() {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onAddRoutine={handleAddRoutine}
+        existingRoutines={routines}
       />
 
       <DayDetailModal

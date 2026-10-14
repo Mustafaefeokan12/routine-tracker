@@ -338,6 +338,23 @@ export default function QuickAddModal({
             )}
           </div>
 
+          {/* Eisenhower Matrix Quadrant Selector */}
+          <div>
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5">
+              Eisenhower Öncelik Kadranı
+            </label>
+            <select
+              value={eisenhower}
+              onChange={(e) => setEisenhower(e.target.value)}
+              className="w-full bg-[#121316] border border-[#262832] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-neutral-500"
+            >
+              <option value="q1">🔥 1. Kadran: Acil & Önemli (Do / Hemen Yap)</option>
+              <option value="q2">🎯 2. Kadran: Önemli & Acil Değil (Schedule / Planla)</option>
+              <option value="q3">⚡ 3. Kadran: Acil & Hızlı (Delegate / 2-Dk)</option>
+              <option value="q4">⛔ 4. Kadran: Düşük Öncelik (Eliminate / Azalt)</option>
+            </select>
+          </div>
+
           {/* Sub-Checklist Builder */}
           <div>
             <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5">
