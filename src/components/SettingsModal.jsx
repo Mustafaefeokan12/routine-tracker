@@ -357,6 +357,34 @@ export default function SettingsModal({
             >
               <Sparkles className="w-3.5 h-3.5 text-neutral-500" /> 30 Günlük Örnek Veri Yükle
             </button>
+
+            {/* Version & Force Refresh */}
+            <div className="pt-2 text-center">
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    if ('caches' in window) {
+                      const keys = await caches.keys();
+                      await Promise.all(keys.map((k) => caches.delete(k)));
+                    }
+                    if ('serviceWorker' in navigator) {
+                      const registrations = await navigator.serviceWorker.getRegistrations();
+                      for (const reg of registrations) {
+                        await reg.unregister();
+                      }
+                    }
+                  } catch (e) {
+                    console.error('Cache purge failed:', e);
+                  }
+                  window.location.reload();
+                }}
+                className="text-[11px] text-neutral-500 hover:text-neutral-300 underline underline-offset-4 transition-colors py-1 px-2"
+                title="Tüm önbelleği temizleyip en son sürümü indirir"
+              >
+                Sürüm 2.2 • Apple Slate • Önbelleği Temizle & Yenile
+              </button>
+            </div>
           </div>
         </div>
       </div>
