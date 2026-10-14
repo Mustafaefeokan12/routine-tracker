@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { X, Download, Upload, RefreshCw, Moon, Clock, Target, ShieldCheck, Sparkles, Flame, Volume2, VolumeX } from 'lucide-react';
-import { db, DEFAULT_ROUTINES } from '../db';
+import { X, Download, Upload, Clock, Target, ShieldCheck, Sparkles, Flame, Volume2, VolumeX, Lock } from 'lucide-react';
+import { exportBackupData, restoreBackupData } from '../db';
+import PinLockScreen from './PinLockScreen';
 
 export default function SettingsModal({
   isOpen,
@@ -14,41 +15,35 @@ export default function SettingsModal({
   soundEnabled,
   onToggleSound,
   onSeedDemoData,
-  onReloadData
+  onReloadData,
+  pinEnabled = false,
+  storedPinHash = '',
+  onSavePin,
+  onRemovePin
 }) {
   const [importStatus, setImportStatus] = useState('');
   const [customPrice, setCustomPrice] = useState(tereaStickPrice || 6.0);
+  const [pinModalMode, setPinModalMode] = useState(null); // 'setup' | 'change_verify' | 'remove_verify'
 
   if (!isOpen) return null;
 
   // Export all data to JSON
   const handleExport = async () => {
-    const routines = await db.routines.toArray();
-    const logs = await db.logs.toArray();
-    const days = await db.days.toArray();
-    const tereaLogs = await db.tereaLogs.toArray();
-    const settings = await db.settings.toArray();
-
-    const backup = {
-      version: 2,
-      exportedAt: new Date().toISOString(),
-      routines,
-      logs,
-      days,
-      tereaLogs,
-      settings
-    };
-
-    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `routine_tracker_backup_${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      const backup = await exportBackupData();
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `routine_tracker_backup_${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setImportStatus('❌ Dışa aktarma hatası oluştu.');
+    }
   };
 
-  // Import JSON backup
+  // Import JSON backup with atomic rollback on error
   const handleImport = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -57,30 +52,16 @@ export default function SettingsModal({
       const text = await file.text();
       const data = JSON.parse(text);
 
-      if (data.routines) {
-        await db.routines.clear();
-        await db.routines.bulkAdd(data.routines);
-      }
-      if (data.logs) {
-        await db.logs.clear();
-        await db.logs.bulkAdd(data.logs);
-      }
-      if (data.days) {
-        await db.days.clear();
-        await db.days.bulkAdd(data.days);
-      }
-      if (data.tereaLogs) {
-        await db.tereaLogs.clear();
-        await db.tereaLogs.bulkAdd(data.tereaLogs);
-      }
+      await restoreBackupData(data);
 
       setImportStatus('✅ Yedek başarıyla geri yüklendi!');
       onReloadData();
       setTimeout(() => setImportStatus(''), 3000);
-    } catch (err) {
+    } catch {
       setImportStatus('❌ Hata: Geçersiz yedek dosyası.');
     }
   };
+
 
   const handlePriceSave = (price) => {
     const val = Number(price);
@@ -234,6 +215,49 @@ export default function SettingsModal({
             </button>
           </div>
 
+          {/* PIN Security Lock Setting */}
+          <div className="p-3.5 rounded-2xl bg-[#121316] border border-[#262832] space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-neutral-300 flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5 text-amber-400" /> Güvenlik & PIN Kilidi
+              </span>
+              <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${
+                pinEnabled
+                  ? 'bg-emerald-950/60 text-emerald-400 border-emerald-800/60'
+                  : 'bg-neutral-800 text-neutral-400 border-neutral-700'
+              }`}>
+                {pinEnabled ? 'Aktif 🔒' : 'Kapalı 🔓'}
+              </span>
+            </div>
+
+            {pinEnabled ? (
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPinModalMode('change_verify')}
+                  className="py-2 px-3 rounded-xl bg-[#17181d] hover:bg-[#202228] border border-[#262832] text-xs font-semibold text-neutral-200 transition-colors spring-click"
+                >
+                  PIN Değiştir
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPinModalMode('remove_verify')}
+                  className="py-2 px-3 rounded-xl bg-red-950/30 hover:bg-red-950/60 border border-red-800/30 text-xs font-semibold text-red-400 transition-colors spring-click"
+                >
+                  Kilidi Kaldır
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setPinModalMode('setup')}
+                className="w-full py-2 px-3 rounded-xl bg-[#17181d] hover:bg-[#202228] border border-[#262832] text-xs font-semibold text-amber-300 flex items-center justify-center gap-1.5 transition-colors spring-click"
+              >
+                <Lock className="w-3.5 h-3.5" /> 4 Haneli PIN Kilidi Oluştur
+              </button>
+            )}
+          </div>
+
           {/* Backup & Restore (Offline-First) */}
           <div className="p-3.5 rounded-2xl bg-[#121316] border border-[#262832] space-y-2.5">
             <span className="text-xs font-bold text-neutral-300 block">
@@ -278,6 +302,49 @@ export default function SettingsModal({
           </div>
         </div>
       </div>
+
+      {/* PIN Security Modal for Setup / Change / Removal */}
+      {pinModalMode === 'setup' && (
+        <PinLockScreen
+          isOpen={true}
+          mode="setup"
+          title="PIN Kilidi Belirle"
+          subtitle="4 haneli yeni bir güvenlik PIN kodu girin"
+          onSuccess={async (newHash) => {
+            if (onSavePin) await onSavePin(newHash);
+            setPinModalMode(null);
+          }}
+          onCancel={() => setPinModalMode(null)}
+        />
+      )}
+
+      {pinModalMode === 'change_verify' && (
+        <PinLockScreen
+          isOpen={true}
+          mode="unlock"
+          storedPinHash={storedPinHash}
+          title="Mevcut PIN Doğrulama"
+          subtitle="Yeni PIN belirlemek için mevcut PIN kodunuzu girin"
+          onSuccess={() => setPinModalMode('setup')}
+          onCancel={() => setPinModalMode(null)}
+        />
+      )}
+
+      {pinModalMode === 'remove_verify' && (
+        <PinLockScreen
+          isOpen={true}
+          mode="unlock"
+          storedPinHash={storedPinHash}
+          title="PIN Kilidini Kaldır"
+          subtitle="Güvenlik kilidini kapatmak için mevcut PIN kodunuzu girin"
+          onSuccess={async () => {
+            if (onRemovePin) await onRemovePin();
+            setPinModalMode(null);
+          }}
+          onCancel={() => setPinModalMode(null)}
+        />
+      )}
     </div>
   );
 }
+

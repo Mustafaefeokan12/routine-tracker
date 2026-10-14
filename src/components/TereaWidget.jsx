@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Flame, Plus, Minus, TrendingDown, DollarSign, Calendar, ChevronDown, ChevronUp, Settings } from 'lucide-react';
+import { Flame, Plus, Minus, ChevronDown, ChevronUp } from 'lucide-react';
 import { playTereaSound, triggerHaptic } from '../utils/sound';
 
 export default function TereaWidget({

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, CheckCircle2, Award, FileText, Save, Flame } from 'lucide-react';
+import { X, Calendar, CheckCircle2, FileText, Save, Flame } from 'lucide-react';
 import { formatDateDisplay } from '../utils/date';
 import { db } from '../db';
 

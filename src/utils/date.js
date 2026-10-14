@@ -37,84 +37,142 @@ export function formatShortDate(dateStr) {
 }
 
 /**
+ * Returns shifted date string in YYYY-MM-DD format with timezone/DST safety
+ */
+export function getShiftedDateStr(dateStr, dayOffset) {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  // Noon anchor prevents DST boundary crossing anomalies
+  const date = new Date(year, month - 1, day, 12, 0, 0);
+  date.setDate(date.getDate() + dayOffset);
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/**
  * Returns past N days dates in YYYY-MM-DD format up to today
  */
 export function getPastDaysList(count = 70, resetHour = 4) {
+  const today = getTodayString(resetHour);
   const result = [];
-  const base = new Date();
-  if (base.getHours() < resetHour) {
-    base.setDate(base.getDate() - 1);
-  }
-
   for (let i = count - 1; i >= 0; i--) {
-    const d = new Date(base);
-    d.setDate(base.getDate() - i);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    result.push(`${y}-${m}-${day}`);
+    result.push(getShiftedDateStr(today, -i));
   }
   return result;
 }
 
 /**
- * Calculate streak with Flexible Discipline (1 Streak Freeze allowed per week)
+ * Calculate streak with Flexible Discipline (1 Streak Freeze allowed per 7-day rolling window)
+ * Freeze is only consumed between active streak dates and not on historical days before streak inception.
  */
 export function calculateStreaks(daysMap, target = 80, resetHour = 4) {
+  if (!daysMap || typeof daysMap !== 'object') {
+    return { currentStreak: 0, maxStreak: 0, freezeUsed: false };
+  }
+
   const today = getTodayString(resetHour);
-  let currentStreak = 0;
-  let maxStreak = 0;
-  let tempStreak = 0;
-  let freezeUsed = false;
-
-  const sortedDates = Object.keys(daysMap).sort();
-
-  for (let i = 0; i < sortedDates.length; i++) {
-    const d = sortedDates[i];
-    const score = daysMap[d]?.totalScore || 0;
-    if (score >= target) {
-      tempStreak++;
-      if (tempStreak > maxStreak) maxStreak = tempStreak;
-    } else {
-      tempStreak = 0;
-    }
-  }
-
-  // Calculate current streak backwards from today
-  const curr = new Date();
-  if (curr.getHours() < resetHour) {
-    curr.setDate(curr.getDate() - 1);
-  }
-
-  let checkDate = new Date(curr);
   const todayScore = daysMap[today]?.totalScore || 0;
-  
-  // If today hasn't hit target yet, check from yesterday so user has until 04:00
-  if (todayScore < target) {
-    checkDate.setDate(checkDate.getDate() - 1);
-  }
 
-  let freezesLeft = 1; // 1 freeze grace day
+  let currentStreak = 0;
+  let freezeUsed = false;
+  const freezeDates = new Set();
+
+  // If today hasn't hit target yet, check from yesterday so user has until 04:00 resetHour
+  let checkDateStr = (todayScore >= target) ? today : getShiftedDateStr(today, -1);
 
   while (true) {
-    const y = checkDate.getFullYear();
-    const m = String(checkDate.getMonth() + 1).padStart(2, '0');
-    const d = String(checkDate.getDate()).padStart(2, '0');
-    const key = `${y}-${m}-${d}`;
-
-    const score = daysMap[key]?.totalScore || 0;
+    const score = daysMap[checkDateStr]?.totalScore || 0;
     if (score >= target) {
       currentStreak++;
-      checkDate.setDate(checkDate.getDate() - 1);
-    } else if (freezesLeft > 0 && currentStreak > 0) {
-      // Use streak freeze
-      freezesLeft--;
-      freezeUsed = true;
-      checkDate.setDate(checkDate.getDate() - 1);
+      checkDateStr = getShiftedDateStr(checkDateStr, -1);
     } else {
-      break;
+      // score < target: check if this day is eligible for streak freeze protection
+      const prevDateStr = getShiftedDateStr(checkDateStr, -1);
+      const prevScore = daysMap[prevDateStr]?.totalScore || 0;
+
+      // Rolling 7-day window verification for freezes
+      let isWithin7DaysOfAnotherFreeze = false;
+      const checkTimestamp = new Date(checkDateStr + 'T12:00:00Z').getTime();
+      for (const fDate of freezeDates) {
+        const fTimestamp = new Date(fDate + 'T12:00:00Z').getTime();
+        const diffDays = Math.abs(checkTimestamp - fTimestamp) / (1000 * 60 * 60 * 24);
+        if (diffDays < 7) {
+          isWithin7DaysOfAnotherFreeze = true;
+          break;
+        }
+      }
+
+      // Freeze is ONLY valid if:
+      // 1. Streak is active forward (currentStreak > 0) OR today is in progress and yesterday missed
+      // 2. The day before (prevDateStr) has score >= target (genuine bridge between active streak days)
+      // 3. No conflict with another freeze within 7 rolling calendar days
+      const canFreeze = (currentStreak > 0 || checkDateStr === getShiftedDateStr(today, -1))
+        && prevScore >= target
+        && !isWithin7DaysOfAnotherFreeze;
+
+      if (canFreeze) {
+        freezeDates.add(checkDateStr);
+        freezeUsed = true;
+        // Continue walking backward across the frozen bridge
+        checkDateStr = prevDateStr;
+      } else {
+        // Streak broken or pre-inception boundary reached
+        break;
+      }
     }
   }
 
+  // Calculate maxStreak across all historical dates with consecutive calendar day checks
+  let maxStreak = 0;
+  const recordedDates = Object.keys(daysMap)
+    .filter((k) => /^\d{4}-\d{2}-\d{2}$/.test(k) && (daysMap[k]?.totalScore || 0) > 0)
+    .sort();
+
+  if (recordedDates.length > 0) {
+    const earliestDate = recordedDates[0];
+    const latestDate = today;
+
+    let tempStreak = 0;
+    const histFreezeDates = new Set();
+    let walkDate = earliestDate;
+
+    while (walkDate <= latestDate) {
+      const score = daysMap[walkDate]?.totalScore || 0;
+      if (score >= target) {
+        tempStreak++;
+        if (tempStreak > maxStreak) {
+          maxStreak = tempStreak;
+        }
+        walkDate = getShiftedDateStr(walkDate, 1);
+      } else {
+        const nextDate = getShiftedDateStr(walkDate, 1);
+        const nextScore = daysMap[nextDate]?.totalScore || 0;
+
+        let hasConflict = false;
+        const walkTimestamp = new Date(walkDate + 'T12:00:00Z').getTime();
+        for (const fDate of histFreezeDates) {
+          const fTimestamp = new Date(fDate + 'T12:00:00Z').getTime();
+          const diffDays = Math.abs(walkTimestamp - fTimestamp) / (1000 * 60 * 60 * 24);
+          if (diffDays < 7) {
+            hasConflict = true;
+            break;
+          }
+        }
+
+        // Bridge between active streak days historically
+        if (tempStreak > 0 && nextScore >= target && !hasConflict) {
+          histFreezeDates.add(walkDate);
+          walkDate = nextDate;
+        } else {
+          tempStreak = 0;
+          walkDate = getShiftedDateStr(walkDate, 1);
+        }
+      }
+    }
+  }
+
+  maxStreak = Math.max(maxStreak, currentStreak);
   return { currentStreak, maxStreak, freezeUsed };
 }
+

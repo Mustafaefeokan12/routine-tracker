@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import { db, initDatabase } from './db';
 import { getTodayString, calculateStreaks, getPastDaysList } from './utils/date';
-import { playClickSound, playTereaSound, triggerHaptic } from './utils/sound';
+import { playClickSound } from './utils/sound';
 import Header from './components/Header';
 import RoutineList from './components/RoutineList';
 import TrackerHeatmap from './components/TrackerHeatmap';
@@ -11,7 +11,8 @@ import QuickAddModal from './components/QuickAddModal';
 import DayDetailModal from './components/DayDetailModal';
 import SettingsModal from './components/SettingsModal';
 import BadgesModal from './components/BadgesModal';
-import { CheckSquare, BarChart2, Plus, Flame, Award } from 'lucide-react';
+import PinLockScreen from './components/PinLockScreen';
+import { CheckSquare, BarChart2, Plus } from 'lucide-react';
 
 export default function App() {
   const [routines, setRoutines] = useState([]);
@@ -24,6 +25,12 @@ export default function App() {
   const [streak, setStreak] = useState(0);
   const [freezeUsed, setFreezeUsed] = useState(false);
 
+  // Security PIN State
+  const [pinEnabled, setPinEnabled] = useState(false);
+  const [storedPinHash, setStoredPinHash] = useState('');
+  const [isAppLocked, setIsAppLocked] = useState(false);
+  const isPinCheckedRef = useRef(false);
+
   // Terea State
   const [tereaPrice, setTereaPrice] = useState(6.0); // 6.00 TL per stick (120 TL pack)
   const [todayTereaSticks, setTodayTereaSticks] = useState(0);
@@ -35,6 +42,7 @@ export default function App() {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isBadgesModalOpen, setIsBadgesModalOpen] = useState(false);
   const [selectedDay, setSelectedDay] = useState(null);
+
 
   // Load all data from IndexedDB
   const loadData = useCallback(async () => {
@@ -55,6 +63,19 @@ export default function App() {
 
     const soundSet = await db.settings.get('soundEnabled');
     setSoundEnabled(soundSet ? soundSet.value : true);
+
+    // Load Security PIN settings
+    const pinEnabledSet = await db.settings.get('pinEnabled');
+    const pinHashSet = await db.settings.get('pinHash');
+    const hasPin = !!(pinEnabledSet?.value && pinHashSet?.value);
+    setPinEnabled(hasPin);
+    setStoredPinHash(pinHashSet?.value || '');
+    if (hasPin) {
+      setIsAppLocked((prev) => (isPinCheckedRef.current ? prev : true));
+    } else {
+      setIsAppLocked(false);
+    }
+    isPinCheckedRef.current = true;
 
     const currentToday = getTodayString(resetVal);
     setTodayStr(currentToday);
@@ -337,6 +358,23 @@ export default function App() {
     await db.settings.put({ key: 'soundEnabled', value: next });
   };
 
+  // Save new PIN
+  const handleSavePin = async (hash) => {
+    await db.settings.put({ key: 'pinHash', value: hash });
+    await db.settings.put({ key: 'pinEnabled', value: true });
+    setStoredPinHash(hash);
+    setPinEnabled(true);
+  };
+
+  // Remove PIN
+  const handleRemovePin = async () => {
+    await db.settings.delete('pinHash');
+    await db.settings.put({ key: 'pinEnabled', value: false });
+    setStoredPinHash('');
+    setPinEnabled(false);
+    setIsAppLocked(false);
+  };
+
   // Seed 30 days of realistic history (Both Routines + Terea Consumption)
   const handleSeedDemoData = async () => {
     const base = new Date();
@@ -498,6 +536,10 @@ export default function App() {
         onToggleSound={handleToggleSound}
         onSeedDemoData={handleSeedDemoData}
         onReloadData={loadData}
+        pinEnabled={pinEnabled}
+        storedPinHash={storedPinHash}
+        onSavePin={handleSavePin}
+        onRemovePin={handleRemovePin}
       />
 
       <BadgesModal
@@ -506,6 +548,16 @@ export default function App() {
         totalScore={currentScore}
         streak={streak}
       />
+
+      {/* App Startup PIN Security Lock Screen */}
+      {isAppLocked && pinEnabled && storedPinHash && (
+        <PinLockScreen
+          isOpen={true}
+          mode="unlock"
+          storedPinHash={storedPinHash}
+          onSuccess={() => setIsAppLocked(false)}
+        />
+      )}
     </div>
   );
 }

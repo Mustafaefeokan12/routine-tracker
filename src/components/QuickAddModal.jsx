@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Plus, Star, Tag, Clock } from 'lucide-react';
+import { X, Plus, Star } from 'lucide-react';
 
 export default function QuickAddModal({ isOpen, onClose, onAddRoutine }) {
   const [title, setTitle] = useState('');

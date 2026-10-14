@@ -1,5 +1,5 @@
 import React from 'react';
-import { Flame, Award, Calendar, Settings as SettingsIcon, BarChart3, ShieldCheck, Trophy } from 'lucide-react';
+import { Flame, Settings as SettingsIcon, BarChart3, Trophy } from 'lucide-react';
 import { formatDateDisplay } from '../utils/date';
 
 export default function Header({

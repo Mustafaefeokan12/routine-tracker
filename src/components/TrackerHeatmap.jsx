@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { getPastDaysList, formatShortDate, formatDateDisplay } from '../utils/date';
-import { Flame, Trophy, TrendingUp, Calendar, Info, Sparkles, CheckSquare, DollarSign } from 'lucide-react';
+import { Flame, Sparkles, CheckSquare } from 'lucide-react';
 
 export default function TrackerHeatmap({
   daysMap,
