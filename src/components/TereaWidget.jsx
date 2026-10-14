@@ -63,13 +63,13 @@ export default function TereaWidget({
             Bugün İçilen
           </span>
           <div className="flex items-baseline gap-2 mt-0.5">
-            <span className="text-3xl font-black text-white font-mono tracking-tight">
+            <span className="text-3xl font-black text-white font-mono tracking-tight privacy-blur">
               {todaySticks}
             </span>
             <span className="text-xs font-semibold text-neutral-400">Dal</span>
-            <span className="text-xs text-neutral-500">({todayPacks} Paket)</span>
+            <span className="text-xs text-neutral-500 privacy-blur">({todayPacks} Paket)</span>
           </div>
-          <p className="text-xs font-bold text-amber-400 mt-0.5 font-mono">
+          <p className="text-xs font-bold text-amber-400 mt-0.5 font-mono privacy-blur">
             Bugünkü Tutar: {todaySpent} TL
           </p>
         </div>
@@ -103,11 +103,11 @@ export default function TereaWidget({
             Son 7 Gün
           </span>
           <div className="mt-1">
-            <p className="text-sm font-black text-white font-mono">{stats.weekSticks} Dal</p>
-            <p className="text-[10px] font-bold text-amber-400 font-mono">
+            <p className="text-sm font-black text-white font-mono privacy-blur">{stats.weekSticks} Dal</p>
+            <p className="text-[10px] font-bold text-amber-400 font-mono privacy-blur">
               {stats.weekSpent.toFixed(0)} TL
             </p>
-            <span className="text-[9px] text-neutral-500 font-medium">({stats.weekPacks} Pkt)</span>
+            <span className="text-[9px] text-neutral-500 font-medium privacy-blur">({stats.weekPacks} Pkt)</span>
           </div>
         </div>
 
@@ -117,11 +117,11 @@ export default function TereaWidget({
             Bu Ay (1'den)
           </span>
           <div className="mt-1">
-            <p className="text-sm font-black text-white font-mono">{stats.monthSticks} Dal</p>
-            <p className="text-[10px] font-bold text-amber-400 font-mono">
+            <p className="text-sm font-black text-white font-mono privacy-blur">{stats.monthSticks} Dal</p>
+            <p className="text-[10px] font-bold text-amber-400 font-mono privacy-blur">
               {stats.monthSpent.toFixed(0)} TL
             </p>
-            <span className="text-[9px] text-neutral-500 font-medium">({stats.monthPacks} Pkt)</span>
+            <span className="text-[9px] text-neutral-500 font-medium privacy-blur">({stats.monthPacks} Pkt)</span>
           </div>
         </div>
 
@@ -131,11 +131,11 @@ export default function TereaWidget({
             Tüm Zamanlar
           </span>
           <div className="mt-1">
-            <p className="text-sm font-black text-white font-mono">{stats.allTimeSticks} Dal</p>
-            <p className="text-[10px] font-bold text-amber-400 font-mono">
+            <p className="text-sm font-black text-white font-mono privacy-blur">{stats.allTimeSticks} Dal</p>
+            <p className="text-[10px] font-bold text-amber-400 font-mono privacy-blur">
               {stats.allTimeSpent.toFixed(0)} TL
             </p>
-            <span className="text-[9px] text-neutral-500 font-medium">({stats.allTimePacks} Pkt)</span>
+            <span className="text-[9px] text-neutral-500 font-medium privacy-blur">({stats.allTimePacks} Pkt)</span>
           </div>
         </div>
       </div>

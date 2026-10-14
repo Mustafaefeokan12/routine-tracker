@@ -43,3 +43,15 @@ button, input, select, textarea {
   transform: scale(0.96);
   opacity: 0.9;
 }
+
+/* Privacy Shield (Blur Mode) */
+.privacy-blur {
+  transition: filter 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.privacy-active .privacy-blur {
+  filter: blur(6px);
+  user-select: none;
+}
+.privacy-active .privacy-blur:hover {
+  filter: blur(0px);
+}

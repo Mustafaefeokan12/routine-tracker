@@ -67,8 +67,8 @@
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
 | M1 | E2E Testing Track & Test Infrastructure | Test harness using native `node:test`, test runners, Tiers 1-4 test suite, publish `TEST_READY.md` | none | DONE |
-| M2 | Core Storage, Schema & Discipline Engine | Dexie v3 schema, compound indexes, streak calculation & freeze fix, PIN lock, atomic backup, Terea engine core | none | IN_PROGRESS |
-| M3 | Productivity & 300 Modular Features UI | Quantity tracker, MIT star, 2-minute rule, habit stacking, sub-checklists, Eisenhower view, privacy shield, category heatmap | M2 | PLANNED |
+| M2 | Core Storage, Schema & Discipline Engine | Dexie v3 schema, compound indexes, streak calculation & freeze fix, PIN lock, atomic backup, Terea engine core | none | DONE |
+| M3 | Productivity & 300 Modular Features UI | Quantity tracker, MIT star, 2-minute rule, habit stacking, sub-checklists, Eisenhower view, privacy shield, category heatmap | M2 | IN_PROGRESS |
 | M4 | Apple Minimalist Design System & PWA / CI-CD | 3-theme switcher, procedural audio, haptics, service worker offline caching, Oxlint cleanup, deploy.yml validation | M3 | PLANNED |
 | M5 | Final Milestone: 100% E2E Test Pass & Hardening | Phase 1: 100% E2E test pass across Tiers 1-4. Phase 2: Tier 5 adversarial hardening & forensic integrity audit | M1, M4 | PLANNED |
 

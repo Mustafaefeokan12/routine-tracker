@@ -1,5 +1,5 @@
 import React from 'react';
-import { Flame, Settings as SettingsIcon, BarChart3, Trophy } from 'lucide-react';
+import { Flame, Settings as SettingsIcon, BarChart3, Trophy, Eye, EyeOff } from 'lucide-react';
 import { formatDateDisplay } from '../utils/date';
 
 export default function Header({
@@ -13,7 +13,9 @@ export default function Header({
   onOpenSettings,
   onOpenBadges,
   onToggleView,
-  currentView
+  currentView,
+  privacyMode = false,
+  onTogglePrivacy
 }) {
   const percentage = Math.min(Math.round((currentScore / (targetScore || 100)) * 100), 100);
   const isOverachieved = currentScore > targetScore;
@@ -38,6 +40,18 @@ export default function Header({
 
           {/* Right Action Icons */}
           <div className="flex items-center gap-1.5">
+            <button
+              onClick={onTogglePrivacy}
+              aria-label="Gizlilik Kalkanı"
+              className={`p-2.5 rounded-xl border transition-all spring-click ${
+                privacyMode
+                  ? 'bg-cyan-950/50 border-cyan-700/60 text-cyan-300 shadow-sm shadow-cyan-500/20'
+                  : 'bg-[#17181d] border-[#23252e] text-neutral-300 hover:text-white'
+              }`}
+              title={privacyMode ? 'Gizlilik Kalkanı Aktif (Bulanık)' : 'Gizlilik Kalkanını Aç'}
+            >
+              {privacyMode ? <EyeOff className="w-5 h-5 text-cyan-400" /> : <Eye className="w-5 h-5" />}
+            </button>
             <button
               onClick={onOpenBadges}
               aria-label="Rozetler & Seviye"
@@ -101,7 +115,7 @@ export default function Header({
 
             <div>
               <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl font-black tracking-tight text-white">
+                <span className="text-2xl font-black tracking-tight text-white privacy-blur">
                   {currentScore}
                 </span>
                 <span className="text-xs font-semibold text-neutral-400">
@@ -132,7 +146,7 @@ export default function Header({
             </div>
 
             {/* Terea Quick Pill */}
-            <div className="px-2 py-0.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[10px] font-bold text-amber-300 font-mono">
+            <div className="px-2 py-0.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[10px] font-bold text-amber-300 font-mono privacy-blur">
               {todayTereaSticks} Dal • {todayTereaSpent} TL
             </div>
           </div>

@@ -141,7 +141,7 @@ export default function BadgesModal({
           <div className="grid grid-cols-2 gap-2.5">
             {BADGES_CONFIG.map((b) => {
               const Icon = b.icon;
-              const isUnlocked = totalScore >= 70 || streak >= 1; // Unlocks with progress
+              const isUnlocked = (unlockedBadges && unlockedBadges.includes(b.id)) || totalScore >= 70 || streak >= 1; // Unlocks with progress
 
               return (
                 <div
