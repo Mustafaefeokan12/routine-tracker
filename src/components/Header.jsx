@@ -33,8 +33,9 @@ export default function Header({
                 {formatDateDisplay(todayStr)}
               </p>
             </div>
-            <h1 className="text-xl font-bold tracking-tight text-white mt-0.5">
+            <h1 className="text-xl font-bold tracking-tight text-white mt-0.5 flex items-center gap-2">
               Günlük Rutinler
+              <span className="text-[10px] font-semibold tracking-normal px-1.5 py-0.5 rounded-full bg-[#1e2029] text-neutral-400 border border-[#2d303d]">v2.2</span>
             </h1>
           </div>
 
