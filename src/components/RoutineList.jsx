@@ -52,22 +52,24 @@ export default function RoutineList({
   const totalCompleted = routines.filter((r) => !!completedMap[r.id]).length;
   const isAllDone = routines.length > 0 && totalCompleted === routines.length;
 
-  // Eisenhower Quadrant Grouping
-  const q1Tasks = routines.filter((r) => r.isMit || r.eisenhower === 'q1');
+  // Eisenhower Quadrant Grouping (Mutually Exclusive Partitions)
+  const q1Tasks = routines.filter(
+    (r) => r.eisenhower === 'q1' || (r.isMit && !r.eisenhower)
+  );
   const q2Tasks = routines.filter(
     (r) =>
-      !r.isMit &&
-      !r.isTwoMinuteRule &&
-      !r.isNegative &&
-      (r.eisenhower === 'q2' || r.difficulty >= 3 || (!r.eisenhower && r.isRoutine))
+      r.eisenhower === 'q2' ||
+      (!r.eisenhower && !r.isMit && !r.isTwoMinuteRule && !r.isNegative)
   );
   const q3Tasks = routines.filter(
-    (r) => !r.isMit && (r.isTwoMinuteRule || r.eisenhower === 'q3')
+    (r) =>
+      r.eisenhower === 'q3' ||
+      (r.isTwoMinuteRule && !r.eisenhower && !r.isMit)
   );
   const q4Tasks = routines.filter(
     (r) =>
-      !r.isMit &&
-      (r.isNegative || r.eisenhower === 'q4' || (!r.isRoutine && !r.isTwoMinuteRule))
+      r.eisenhower === 'q4' ||
+      (r.isNegative && !r.eisenhower && !r.isMit && !r.isTwoMinuteRule)
   );
 
   return (

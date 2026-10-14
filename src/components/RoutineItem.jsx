@@ -84,12 +84,8 @@ export default function RoutineItem({
       onUpdateQuantity(routine, nextVal);
     }
 
-    // Auto-complete or un-complete based on target quantity
-    if (nextVal >= targetQty && !isCompleted) {
-      handleToggle();
-    } else if (nextVal < targetQty && isCompleted) {
-      handleToggle();
-    }
+    // Auto-completion and un-completion handled cleanly in onUpdateQuantity (App.jsx) without resetting progress to 0.
+    // Redundant call removed: if (nextVal >= targetQty && !isCompleted) { handleToggle(); }
   };
 
   return (
@@ -123,8 +119,9 @@ export default function RoutineItem({
               } else {
                 onUpdateQuantity(routine, 0);
               }
+            } else {
+              handleToggle();
             }
-            handleToggle();
           }}
           className={`mt-0.5 flex-shrink-0 w-6 h-6 rounded-lg border flex items-center justify-center transition-all ${
             isCompleted

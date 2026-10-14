@@ -438,7 +438,10 @@ export default function App() {
     );
 
     const allDone = updatedSubtasks.length > 0 && updatedSubtasks.every((st) => st.done);
-    if (allDone && !completedMap[routine.id]) {
+    const isCompleted = !!completedMap[routine.id];
+    if (allDone && !isCompleted) {
+      handleToggleRoutine(routine);
+    } else if (isCompleted && !allDone) {
       handleToggleRoutine(routine);
     }
   };
