@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, Download, Upload, Clock, Target, ShieldCheck, Sparkles, Flame, Volume2, VolumeX, Lock } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Download, Upload, Clock, Target, ShieldCheck, Sparkles, Flame, Volume2, VolumeX, Lock, Trash2 } from 'lucide-react';
 import { exportBackupData, restoreBackupData } from '../db';
 import PinLockScreen from './PinLockScreen';
 
@@ -15,6 +15,8 @@ export default function SettingsModal({
   soundEnabled,
   onToggleSound,
   onSeedDemoData,
+  onClearHistory,
+  onResetAllData,
   onReloadData,
   pinEnabled = false,
   storedPinHash = '',
@@ -25,7 +27,15 @@ export default function SettingsModal({
   const [customPrice, setCustomPrice] = useState(tereaStickPrice || 6.0);
   const [pinModalMode, setPinModalMode] = useState(null); // 'setup' | 'change_verify' | 'remove_verify'
 
+  useEffect(() => {
+    if (tereaStickPrice !== undefined && tereaStickPrice !== null) {
+      setCustomPrice(tereaStickPrice);
+    }
+  }, [tereaStickPrice]);
+
   if (!isOpen) return null;
+
+  const numericPrice = Number(customPrice) || 0;
 
   // Export all data to JSON
   const handleExport = async () => {
@@ -62,9 +72,8 @@ export default function SettingsModal({
     }
   };
 
-
   const handlePriceSave = (price) => {
-    const val = Number(price);
+    const val = parseFloat(price);
     if (!isNaN(val) && val > 0) {
       setCustomPrice(val);
       onUpdateTereaPrice(val);
@@ -88,33 +97,36 @@ export default function SettingsModal({
         </div>
 
         <div className="space-y-4 mt-4">
-          {/* Terea Price Setting (CRITICAL USER REQUEST) */}
+          {/* Terea Price Setting (Safe numeric coercion, no screen crash) */}
           <div className="p-3.5 rounded-2xl bg-[#121316] border border-[#262832]">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold text-neutral-300 flex items-center gap-1.5">
-                <Flame className="w-3.5 h-3.5 text-amber-400" /> 1 Dal Terea Fiyatı (TL)
+                <Flame className="w-3.5 h-3.5 text-neutral-400" /> 1 Dal Terea Fiyatı (TL)
               </span>
-              <span className="text-xs font-mono font-bold text-amber-300">
-                {customPrice.toFixed(2)} TL / Dal (Paket: {(customPrice * 20).toFixed(0)} TL)
+              <span className="text-xs font-mono font-semibold text-neutral-300">
+                {numericPrice > 0 ? numericPrice.toFixed(2) : '0.00'} TL / Dal (Paket: {(numericPrice * 20).toFixed(0)} TL)
               </span>
             </div>
 
             {/* Quick Price Buttons */}
             <div className="grid grid-cols-4 gap-1.5 mb-2.5">
-              {[5.0, 5.5, 6.0, 7.0].map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => handlePriceSave(p)}
-                  className={`py-1.5 rounded-xl text-xs font-bold border transition-all ${
-                    customPrice === p
-                      ? 'bg-amber-500 border-amber-400 text-black shadow-md'
-                      : 'bg-[#17181d] border-[#262832] text-neutral-400 hover:text-white'
-                  }`}
-                >
-                  {p.toFixed(1)} TL
-                </button>
-              ))}
+              {[5.0, 5.5, 6.0, 7.0].map((p) => {
+                const isSelected = Math.abs(numericPrice - p) < 0.01;
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => handlePriceSave(p)}
+                    className={`py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                      isSelected
+                        ? 'bg-white text-black border-white shadow-sm'
+                        : 'bg-[#17181d] border-[#262832] text-neutral-400 hover:text-white'
+                    }`}
+                  >
+                    {p.toFixed(1)} TL
+                  </button>
+                );
+              })}
             </div>
 
             {/* Custom Input */}
@@ -124,14 +136,26 @@ export default function SettingsModal({
                 step="0.1"
                 min="0.1"
                 value={customPrice}
-                onChange={(e) => setCustomPrice(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setCustomPrice(val);
+                  const parsed = parseFloat(val);
+                  if (!isNaN(parsed) && parsed > 0) {
+                    onUpdateTereaPrice(parsed);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handlePriceSave(customPrice);
+                  }
+                }}
                 placeholder="Örn: 6.25"
-                className="flex-1 bg-[#17181d] border border-[#262832] rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-amber-400"
+                className="flex-1 bg-[#17181d] border border-[#262832] rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-neutral-500"
               />
               <button
                 type="button"
                 onClick={() => handlePriceSave(customPrice)}
-                className="px-3.5 py-2 rounded-xl bg-amber-500 text-black text-xs font-bold spring-click"
+                className="px-3.5 py-2 rounded-xl bg-white text-black text-xs font-bold spring-click"
               >
                 Kaydet
               </button>
@@ -286,18 +310,52 @@ export default function SettingsModal({
             )}
           </div>
 
-          {/* Demo Data Seeder */}
-          <div className="pt-2">
+          {/* Data Management & Reset Section (CRITICAL FIX FOR DEMO DATA DELETION) */}
+          <div className="p-3.5 rounded-2xl bg-[#121316] border border-[#262832] space-y-2">
+            <span className="text-xs font-bold text-neutral-300 block mb-1">
+              Veri Yönetimi & Sıfırlama
+            </span>
+
+            {/* Clear Past Data / Demo Data */}
             <button
+              type="button"
+              onClick={() => {
+                if (window.confirm('Geçmiş günlerin puanları, günlük loglar ve Terea kayıtları silinsin mi? (Kayıtlı rutinleriniz silinmez)')) {
+                  if (onClearHistory) onClearHistory();
+                  onClose();
+                }
+              }}
+              className="w-full py-2.5 px-3 rounded-xl bg-red-950/20 hover:bg-red-950/40 border border-red-800/30 text-red-400 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors spring-click"
+            >
+              <Trash2 className="w-3.5 h-3.5" /> Geçmiş Verileri & Örnek Logları Temizle
+            </button>
+
+            {/* Complete Factory Reset */}
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm('TÜM veriler ve rutinler sıfırlanıp varsayılan fabrika ayarlarına döndürülsün mü?')) {
+                  if (onResetAllData) onResetAllData();
+                  onClose();
+                }
+              }}
+              className="w-full py-2.5 px-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-700/60 text-neutral-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors spring-click"
+            >
+              🔄 Uygulamayı Sıfırla (Fabrika Ayarları)
+            </button>
+
+            {/* Demo Data Seeder */}
+            <button
+              type="button"
               onClick={() => {
                 if (window.confirm('Geçmiş 30 gün için örnek rutin ve Terea verileri oluşturulsun mu?')) {
                   onSeedDemoData();
                   onClose();
                 }
               }}
-              className="w-full py-2.5 rounded-xl bg-emerald-950/40 hover:bg-emerald-950/70 border border-emerald-800/40 text-emerald-400 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
+              className="w-full py-2 px-3 rounded-xl bg-[#17181d] hover:bg-[#202228] border border-[#262832] text-neutral-500 hover:text-neutral-300 text-[11px] font-medium flex items-center justify-center gap-1.5 transition-colors spring-click"
             >
-              <Sparkles className="w-3.5 h-3.5" /> 30 Günlük Örnek Rutin & Terea Verisi Yükle
+              <Sparkles className="w-3.5 h-3.5 text-neutral-500" /> 30 Günlük Örnek Veri Yükle
             </button>
           </div>
         </div>

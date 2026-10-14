@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import confetti from 'canvas-confetti';
-import { db, initDatabase } from './db';
+import { db, initDatabase, DEFAULT_ROUTINES } from './db';
 import { getTodayString, calculateStreaks, getPastDaysList } from './utils/date';
 import { playClickSound } from './utils/sound';
 import Header from './components/Header';
@@ -619,6 +619,40 @@ export default function App() {
     await loadData();
   };
 
+  // Clear all past days, logs, and Terea history (keeps routines)
+  const handleClearHistory = async () => {
+    await db.days.clear();
+    await db.logs.clear();
+    await db.tereaLogs.clear();
+    setCompletedMap({});
+    setQuantityMap({});
+    setCurrentScore(0);
+    setTodayTereaSticks(0);
+    setDaysMap({});
+    setCategoryScoresMap({});
+    setStreak(0);
+    setFreezeUsed(false);
+    await loadData();
+  };
+
+  // Reset entire application to initial state with clean default routines
+  const handleResetToDefaults = async () => {
+    await db.days.clear();
+    await db.logs.clear();
+    await db.tereaLogs.clear();
+    await db.routines.clear();
+    await db.routines.bulkAdd(DEFAULT_ROUTINES);
+    setCompletedMap({});
+    setQuantityMap({});
+    setCurrentScore(0);
+    setTodayTereaSticks(0);
+    setDaysMap({});
+    setCategoryScoresMap({});
+    setStreak(0);
+    setFreezeUsed(false);
+    await loadData();
+  };
+
   return (
     <div className={`min-h-screen bg-[#0f1014] text-[#f1f2f6] flex flex-col font-sans selection:bg-neutral-800 ${privacyMode ? 'privacy-active' : ''}`}>
       {/* Top Header */}
@@ -642,17 +676,7 @@ export default function App() {
       <main className="flex-1 max-w-md w-full mx-auto px-4 pt-3 space-y-4">
         {currentView === 'routines' ? (
           <>
-            {/* Terea Counter & Spending Engine Widget */}
-            <TereaWidget
-              todaySticks={todayTereaSticks}
-              stickPrice={tereaPrice}
-              stats={tereaStats}
-              onIncrement={handleIncrementTerea}
-              onDecrement={handleDecrementTerea}
-              onOpenSettings={() => setIsSettingsModalOpen(true)}
-            />
-
-            {/* Routine & To-Do List with Dual Filters & Eisenhower Matrix */}
+            {/* 1. Primary Focus: Routine & Daily Task List */}
             <RoutineList
               routines={routines}
               completedMap={completedMap}
@@ -665,6 +689,18 @@ export default function App() {
               onToggleFreeze={handleToggleFreeze}
               onToggleSubtask={handleToggleSubtask}
             />
+
+            {/* 2. Secondary Widget: Terea Counter & Spending Engine (Clean Apple Slate) */}
+            <div className="pt-1">
+              <TereaWidget
+                todaySticks={todayTereaSticks}
+                stickPrice={tereaPrice}
+                stats={tereaStats}
+                onIncrement={handleIncrementTerea}
+                onDecrement={handleDecrementTerea}
+                onOpenSettings={() => setIsSettingsModalOpen(true)}
+              />
+            </div>
           </>
         ) : (
           <TrackerHeatmap
@@ -675,6 +711,7 @@ export default function App() {
             categoryScoresMap={categoryScoresMap}
             onSelectDay={(date) => setSelectedDay(date)}
             onSeedDemoData={handleSeedDemoData}
+            onClearHistory={handleClearHistory}
           />
         )}
       </main>
@@ -689,7 +726,7 @@ export default function App() {
             }`}
           >
             <CheckSquare className="w-5 h-5" />
-            <span className="text-[10px] font-bold">Rutin & Terea</span>
+            <span className="text-[10px] font-bold">Görevler</span>
           </button>
 
           {/* Center Quick Add FAB */}
@@ -741,6 +778,8 @@ export default function App() {
         soundEnabled={soundEnabled}
         onToggleSound={handleToggleSound}
         onSeedDemoData={handleSeedDemoData}
+        onClearHistory={handleClearHistory}
+        onResetAllData={handleResetToDefaults}
         onReloadData={loadData}
         pinEnabled={pinEnabled}
         storedPinHash={storedPinHash}

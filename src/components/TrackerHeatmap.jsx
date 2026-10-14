@@ -9,7 +9,8 @@ export default function TrackerHeatmap({
   tereaPrice = 6.0,
   categoryScoresMap = {},
   onSelectDay,
-  onSeedDemoData
+  onSeedDemoData,
+  onClearHistory
 }) {
   const [heatmapMode, setHeatmapMode] = useState('routine'); // 'routine' | 'terea'
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -279,12 +280,28 @@ export default function TrackerHeatmap({
 
         <div className="mt-3 pt-3 border-t border-[#23252e] flex items-center justify-between text-xs text-neutral-400">
           <span>⚪ Beyaz: <strong>Bugün</strong> • Dokununca detay açılır</span>
-          <button
-            onClick={onSeedDemoData}
-            className="text-[11px] font-semibold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 transition-colors"
-          >
-            <Sparkles className="w-3 h-3" /> Test Verisi Doldur
-          </button>
+          <div className="flex items-center gap-3">
+            {onClearHistory && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm('Geçmiş günler ve test verileri temizlensin mi?')) {
+                    onClearHistory();
+                  }
+                }}
+                className="text-[11px] font-medium text-red-400/80 hover:text-red-300 transition-colors"
+              >
+                Verileri Temizle
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onSeedDemoData}
+              className="text-[11px] font-semibold text-neutral-400 hover:text-neutral-200 flex items-center gap-1 transition-colors"
+            >
+              <Sparkles className="w-3 h-3 text-neutral-500" /> Test Verisi Doldur
+            </button>
+          </div>
         </div>
       </div>
 

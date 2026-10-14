@@ -14,13 +14,13 @@ import {
 } from 'lucide-react';
 
 const CATEGORY_MAP = {
-  study: { label: 'Akademi', color: 'text-indigo-400 bg-indigo-950/40 border-indigo-800/40' },
-  engineering: { label: 'Mühendislik', color: 'text-blue-400 bg-blue-950/40 border-blue-800/40' },
-  fitness: { label: 'Fitness', color: 'text-emerald-400 bg-emerald-950/40 border-emerald-800/40' },
-  health: { label: 'Sağlık', color: 'text-cyan-400 bg-cyan-950/40 border-cyan-800/40' },
-  language: { label: 'Almanca', color: 'text-amber-400 bg-amber-950/40 border-amber-800/40' },
-  mind: { label: 'Zihin', color: 'text-purple-400 bg-purple-950/40 border-purple-800/40' },
-  life: { label: 'Yaşam', color: 'text-rose-400 bg-rose-950/40 border-rose-800/40' }
+  study: { label: 'Akademi', color: 'text-neutral-300 bg-neutral-900 border-[#262832]' },
+  engineering: { label: 'Mühendislik', color: 'text-neutral-300 bg-neutral-900 border-[#262832]' },
+  fitness: { label: 'Fitness', color: 'text-neutral-300 bg-neutral-900 border-[#262832]' },
+  health: { label: 'Sağlık', color: 'text-neutral-300 bg-neutral-900 border-[#262832]' },
+  language: { label: 'Almanca', color: 'text-neutral-300 bg-neutral-900 border-[#262832]' },
+  mind: { label: 'Zihin', color: 'text-neutral-300 bg-neutral-900 border-[#262832]' },
+  life: { label: 'Yaşam', color: 'text-neutral-300 bg-neutral-900 border-[#262832]' }
 };
 
 const TIME_MAP = {
@@ -91,18 +91,18 @@ export default function RoutineItem({
   return (
     <div
       onClick={handleToggle}
-      className={`group relative flex flex-col p-3.5 rounded-2xl border transition-all duration-200 select-none cursor-pointer spring-click ${
+      className={`group relative flex flex-col p-3.5 rounded-2xl border transition-all duration-150 select-none cursor-pointer spring-click ${
         routine.isFrozen
-          ? 'bg-cyan-950/20 border-cyan-800/40 text-cyan-200/90 shadow-sm'
+          ? 'bg-[#121418] border-neutral-700/50 text-neutral-400'
           : routine.isMit && !isCompleted
-          ? 'bg-gradient-to-r from-amber-950/25 via-[#17181d] to-[#17181d] border-amber-500/40 shadow-sm shadow-amber-500/10'
+          ? 'bg-[#17181f] border-neutral-700 shadow-sm'
           : routine.isNegative
           ? isCompleted
-            ? 'bg-emerald-950/20 border-emerald-900/40 opacity-70'
-            : 'bg-rose-950/15 border-rose-900/30 hover:border-rose-800/50'
+            ? 'bg-[#121317] border-neutral-800 opacity-60'
+            : 'bg-[#161418] border-neutral-800'
           : isCompleted
-          ? 'bg-[#14151a]/60 border-[#20222a] opacity-55'
-          : 'bg-[#17181d] border-[#262832] hover:border-[#383b49] shadow-sm'
+          ? 'bg-[#111215] border-[#1d1e26] opacity-50'
+          : 'bg-[#15161b] border-[#23252f] hover:border-[#343644]'
       }`}
     >
       {/* Top Main Row */}
@@ -126,10 +126,10 @@ export default function RoutineItem({
           className={`mt-0.5 flex-shrink-0 w-6 h-6 rounded-lg border flex items-center justify-center transition-all ${
             isCompleted
               ? routine.isNegative
-                ? 'bg-emerald-500 border-emerald-500 text-black shadow-md shadow-emerald-500/20'
-                : 'bg-emerald-500 border-emerald-500 text-black shadow-md shadow-emerald-500/20'
+                ? 'bg-emerald-500 border-emerald-500 text-black shadow-sm'
+                : 'bg-emerald-500 border-emerald-500 text-black shadow-sm'
               : routine.isNegative
-              ? 'border-rose-800/60 bg-rose-950/30 text-rose-400 hover:border-rose-600'
+              ? 'border-neutral-700 bg-neutral-900 text-neutral-400 hover:border-neutral-500'
               : 'border-[#363946] bg-[#1a1c22] hover:border-neutral-400 text-transparent'
           }`}
         >
@@ -149,35 +149,35 @@ export default function RoutineItem({
 
             {/* MIT Star Badge */}
             {routine.isMit && (
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-neutral-800 text-amber-300 border border-neutral-700 flex items-center gap-1">
                 ⭐ MIT
               </span>
             )}
 
             {/* 2-Minute Rule Tag */}
             {routine.isTwoMinuteRule && (
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-950/50 text-cyan-300 border border-cyan-800/50 flex items-center gap-0.5">
+              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-neutral-800 text-neutral-300 border border-neutral-700 flex items-center gap-0.5">
                 ⚡ 2-Dk
               </span>
             )}
 
             {/* Negative Habit Badge */}
             {routine.isNegative && (
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-950/50 text-rose-300 border border-rose-800/50 flex items-center gap-1">
-                <ShieldAlert className="w-3 h-3" />
+              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-neutral-800 text-neutral-300 border border-neutral-700 flex items-center gap-1">
+                <ShieldAlert className="w-3 h-3 text-neutral-400" />
                 {isCompleted ? 'Direnildi ✅' : 'Direnme'}
               </span>
             )}
 
             {/* Routine Freeze Badge */}
             {routine.isFrozen && (
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-950/60 text-cyan-300 border border-cyan-700/60 flex items-center gap-1">
+              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-neutral-800 text-neutral-300 border border-neutral-700 flex items-center gap-1">
                 <Snowflake className="w-3 h-3" /> Donduruldu
               </span>
             )}
 
             {!routine.isRoutine && (
-              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-[#23252e] text-neutral-400 border border-[#2e313d]">
+              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-neutral-800 text-neutral-400 border border-neutral-700">
                 To-Do
               </span>
             )}

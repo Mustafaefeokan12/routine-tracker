@@ -111,7 +111,7 @@ export default function RoutineList({
           aria-label="Eisenhower Matrisi Görünümü"
           className={`px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 text-xs font-bold transition-all spring-click ${
             isEisenhowerView
-              ? 'bg-amber-500/20 border-amber-500/40 text-amber-300 shadow-sm shadow-amber-500/20'
+              ? 'bg-neutral-800 border-neutral-700 text-white shadow-sm'
               : 'bg-[#17181d] border-[#262832] text-neutral-400 hover:text-white'
           }`}
           title="Eisenhower 4-Kadran Matrisi"

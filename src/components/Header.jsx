@@ -34,7 +34,7 @@ export default function Header({
               </p>
             </div>
             <h1 className="text-xl font-bold tracking-tight text-white mt-0.5">
-              Rutin & Terea Tracker
+              Günlük Rutinler
             </h1>
           </div>
 
@@ -146,7 +146,7 @@ export default function Header({
             </div>
 
             {/* Terea Quick Pill */}
-            <div className="px-2 py-0.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[10px] font-bold text-amber-300 font-mono privacy-blur">
+            <div className="px-2 py-0.5 rounded-lg bg-[#121316] border border-[#23252e] text-[10px] font-medium text-neutral-400 font-mono privacy-blur">
               {todayTereaSticks} Dal • {todayTereaSpent} TL
             </div>
           </div>
