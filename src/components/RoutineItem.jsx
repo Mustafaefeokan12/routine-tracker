@@ -140,7 +140,7 @@ export default function RoutineItem({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <p
-              className={`text-sm font-semibold tracking-tight transition-all truncate privacy-blur ${
+              className={`text-sm font-semibold tracking-tight transition-all break-words privacy-blur ${
                 isCompleted ? 'line-through text-neutral-500' : 'text-neutral-100'
               }`}
             >
@@ -295,7 +295,8 @@ export default function RoutineItem({
                 onDelete(routine.id);
               }
             }}
-            className="p-1 rounded-lg text-neutral-600 hover:text-rose-400 hover:bg-[#20222a] transition-colors opacity-0 group-hover:opacity-100"
+            className="p-1.5 rounded-lg text-neutral-400 hover:text-rose-400 active:text-rose-400 hover:bg-[#20222a] transition-colors spring-click"
+            title="Görevi Sil"
           >
             <Trash2 className="w-4 h-4" />
           </button>

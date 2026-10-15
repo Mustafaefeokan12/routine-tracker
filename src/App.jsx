@@ -673,7 +673,7 @@ export default function App() {
       />
 
       {/* Main Container */}
-      <main className="flex-1 max-w-md w-full mx-auto px-4 pt-3 space-y-4">
+      <main className="flex-1 max-w-md w-full mx-auto px-4 pt-3 pb-36 space-y-4">
         {currentView === 'routines' ? (
           <>
             {/* 1. Primary Focus: Routine & Daily Task List */}
@@ -785,6 +785,8 @@ export default function App() {
         storedPinHash={storedPinHash}
         onSavePin={handleSavePin}
         onRemovePin={handleRemovePin}
+        routines={routines}
+        onDeleteRoutine={handleDeleteRoutine}
       />
 
       <BadgesModal
