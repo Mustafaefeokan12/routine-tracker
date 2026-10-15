@@ -39,17 +39,25 @@ self.addEventListener('message', (event) => {
   }
 });
 
-// Fetch: Network-First for HTML/navigation, Stale-While-Revalidate for static assets
+// Fetch: Network-First for HTML/navigation with no-cache validation; Stale-While-Revalidate for static assets
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+
+  const url = new URL(event.request.url);
+
+  // Bypass cache completely for timestamped update-check queries
+  if (url.searchParams.has('_t') || url.searchParams.has('_cb')) {
+    event.respondWith(fetch(event.request, { cache: 'no-store' }));
+    return;
+  }
 
   const isNavigation = event.request.mode === 'navigate' ||
     (event.request.headers.get('accept') && event.request.headers.get('accept').includes('text/html'));
 
   if (isNavigation) {
-    // Network-first for HTML pages so user always gets fresh code when online
+    // Network-first with cache: 'no-cache' to force conditional origin validation (bypasses max-age: 600 disk cache)
     event.respondWith(
-      fetch(event.request)
+      fetch(new Request(event.request, { cache: 'no-cache' }))
         .then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
             const copy = networkResponse.clone();
