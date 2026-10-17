@@ -147,8 +147,11 @@ export default function Header({
             </div>
 
             {/* Terea Quick Pill */}
-            <div className="px-2 py-0.5 rounded-lg bg-[#121316] border border-[#23252e] text-[10px] font-medium text-neutral-400 font-mono privacy-blur">
-              {todayTereaSticks} Dal • {todayTereaSpent} TL
+            <div className="px-2.5 py-1 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs font-bold text-amber-400 font-mono privacy-blur flex items-center gap-1.5 shadow-sm">
+              <span className="text-xs">🔥</span>
+              <span>{todayTereaSticks} Dal</span>
+              <span className="text-neutral-500 font-normal">•</span>
+              <span className="text-neutral-200">{todayTereaSpent} TL</span>
             </div>
           </div>
         </div>

@@ -3,6 +3,7 @@ import {
   Check,
   Star,
   Trash2,
+  Pencil,
   Clock,
   Plus,
   Minus,
@@ -48,6 +49,7 @@ export default function RoutineItem({
   currentQuantity = 0,
   onToggle,
   onDelete,
+  onEdit,
   onUpdateQuantity,
   onToggleMit,
   onToggleFreeze,
@@ -284,6 +286,22 @@ export default function RoutineItem({
           >
             +{routine.weight}P
           </span>
+
+          {/* Edit button */}
+          {onEdit && (
+            <button
+              type="button"
+              aria-label="Düzenle"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(routine);
+              }}
+              className="p-1.5 rounded-lg text-neutral-400 hover:text-white active:text-white hover:bg-[#20222a] transition-colors spring-click"
+              title="Görevi Düzenle"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+          )}
 
           {/* Delete button */}
           <button

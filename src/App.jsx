@@ -44,6 +44,10 @@ export default function App() {
   // UI Navigation & Modals
   const [currentView, setCurrentView] = useState('routines'); // 'routines' | 'tracker'
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingRoutine, setEditingRoutine] = useState(null);
+  const [showFlameToast, setShowFlameToast] = useState(false);
+  const [showTereaDetails, setShowTereaDetails] = useState(false);
+  const toastTimeoutRef = useRef(null);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isBadgesModalOpen, setIsBadgesModalOpen] = useState(false);
   const [selectedDay, setSelectedDay] = useState(null);
@@ -248,11 +252,23 @@ export default function App() {
     } else {
       // Mark Uncompleted
       await db.logs.delete(logId);
+      const numId = Number(routine.id);
+      if (!isNaN(numId)) {
+        await db.logs.delete(`${todayStr}_${numId}`);
+      }
       delete newMap[routine.id];
+      if (!isNaN(numId)) {
+        delete newMap[numId];
+      }
       newScore = Math.max(0, newScore - routine.weight);
 
       if (isQty) {
-        setQuantityMap((prev) => ({ ...prev, [routine.id]: 0 }));
+        setQuantityMap((prev) => {
+          const next = { ...prev };
+          delete next[routine.id];
+          if (!isNaN(numId)) delete next[numId];
+          return next;
+        });
       }
     }
 
@@ -412,18 +428,26 @@ export default function App() {
   // Toggle MIT star
   const handleToggleMit = async (routine) => {
     const nextMit = !routine.isMit;
-    await db.routines.update(routine.id, { isMit: nextMit });
+    const numId = Number(routine.id);
+    let updated = await db.routines.update(routine.id, { isMit: nextMit });
+    if (updated === 0 && !isNaN(numId)) {
+      await db.routines.update(numId, { isMit: nextMit });
+    }
     setRoutines((prev) =>
-      prev.map((r) => (r.id === routine.id ? { ...r, isMit: nextMit } : r))
+      prev.map((r) => (r.id === routine.id || r.id === numId ? { ...r, isMit: nextMit } : r))
     );
   };
 
   // Toggle routine freeze
   const handleToggleFreeze = async (routine) => {
     const nextFreeze = !routine.isFrozen;
-    await db.routines.update(routine.id, { isFrozen: nextFreeze });
+    const numId = Number(routine.id);
+    let updated = await db.routines.update(routine.id, { isFrozen: nextFreeze });
+    if (updated === 0 && !isNaN(numId)) {
+      await db.routines.update(numId, { isFrozen: nextFreeze });
+    }
     setRoutines((prev) =>
-      prev.map((r) => (r.id === routine.id ? { ...r, isFrozen: nextFreeze } : r))
+      prev.map((r) => (r.id === routine.id || r.id === numId ? { ...r, isFrozen: nextFreeze } : r))
     );
   };
 
@@ -507,11 +531,64 @@ export default function App() {
     await loadData();
   };
 
-  // Delete routine
+  // Delete routine permanently
   const handleDeleteRoutine = async (id) => {
+    const numId = Number(id);
     await db.routines.delete(id);
+    if (!isNaN(numId)) {
+      await db.routines.delete(numId);
+    }
     await db.logs.where('routineId').equals(id).delete();
+    if (!isNaN(numId)) {
+      await db.logs.where('routineId').equals(numId).delete();
+    }
+    setCompletedMap((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      delete next[numId];
+      return next;
+    });
+    setQuantityMap((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      delete next[numId];
+      return next;
+    });
     await loadData();
+  };
+
+  // Update/Edit existing routine
+  const handleUpdateRoutine = async (updatedRoutine) => {
+    await db.routines.put(updatedRoutine);
+    await loadData();
+  };
+
+  // Open edit modal for a specific routine
+  const handleOpenEditRoutine = (routine) => {
+    setEditingRoutine(routine);
+    setIsAddModalOpen(true);
+  };
+
+  // Close add/edit modal and clear selection
+  const handleCloseAddModal = () => {
+    setIsAddModalOpen(false);
+    setEditingRoutine(null);
+  };
+
+  // Floating Flame Fast Terea Click (+1 Dal) with tactile feedback & animation
+  const handleFastTereaClick = () => {
+    if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
+      try {
+        window.navigator.vibrate([30, 20, 30]);
+      } catch (e) {}
+    }
+    if (soundEnabled) playClickSound();
+    handleIncrementTerea();
+    setShowFlameToast(true);
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    toastTimeoutRef.current = setTimeout(() => {
+      setShowFlameToast(false);
+    }, 1200);
   };
 
   // Save note for a specific day
@@ -683,23 +760,45 @@ export default function App() {
               quantityMap={quantityMap}
               onToggleRoutine={handleToggleRoutine}
               onDeleteRoutine={handleDeleteRoutine}
-              onOpenAddModal={() => setIsAddModalOpen(true)}
+              onEditRoutine={handleOpenEditRoutine}
+              onOpenAddModal={() => {
+                setEditingRoutine(null);
+                setIsAddModalOpen(true);
+              }}
               onUpdateQuantity={handleUpdateQuantity}
               onToggleMit={handleToggleMit}
               onToggleFreeze={handleToggleFreeze}
               onToggleSubtask={handleToggleSubtask}
             />
 
-            {/* 2. Secondary Widget: Terea Counter & Spending Engine (Clean Apple Slate) */}
-            <div className="pt-1">
-              <TereaWidget
-                todaySticks={todayTereaSticks}
-                stickPrice={tereaPrice}
-                stats={tereaStats}
-                onIncrement={handleIncrementTerea}
-                onDecrement={handleDecrementTerea}
-                onOpenSettings={() => setIsSettingsModalOpen(true)}
-              />
+            {/* 2. Secondary Widget: Terea Counter & Spending Engine (Collapsible for Clean Minimalism) */}
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => setShowTereaDetails((prev) => !prev)}
+                className="w-full py-2.5 px-4 rounded-2xl bg-[#14151a] border border-[#23252e] hover:border-neutral-700 text-xs font-semibold text-neutral-400 hover:text-white flex items-center justify-between transition-all"
+              >
+                <span className="flex items-center gap-2">
+                  <span>🔥</span>
+                  <span>Terea Harcama & Detay Analizi</span>
+                </span>
+                <span className="text-neutral-400 font-mono text-[11px] privacy-blur">
+                  {showTereaDetails ? 'Gizle ▲' : `${todayTereaSticks} Dal • ${(todayTereaSticks * tereaPrice).toFixed(0)} TL ▼`}
+                </span>
+              </button>
+
+              {showTereaDetails && (
+                <div className="mt-3 animate-fade-in">
+                  <TereaWidget
+                    todaySticks={todayTereaSticks}
+                    stickPrice={tereaPrice}
+                    stats={tereaStats}
+                    onIncrement={handleIncrementTerea}
+                    onDecrement={handleDecrementTerea}
+                    onOpenSettings={() => setIsSettingsModalOpen(true)}
+                  />
+                </div>
+              )}
             </div>
           </>
         ) : (
@@ -716,6 +815,27 @@ export default function App() {
         )}
       </main>
 
+      {/* Floating Fast Terea Counter Button (Flame FAB) */}
+      {currentView === 'routines' && (
+        <div className="fixed bottom-20 right-4 z-40 flex flex-col items-end pointer-events-auto">
+          {showFlameToast && (
+            <div className="mb-2 px-3 py-1.5 rounded-full bg-amber-500 text-black text-xs font-black shadow-xl animate-bounce pointer-events-none flex items-center gap-1">
+              <span>+1 Dal Eklendi</span>
+              <span>🔥</span>
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={handleFastTereaClick}
+            aria-label="1 Dal Terea Ekle"
+            className="w-14 h-14 rounded-full bg-[#181920]/95 backdrop-blur-xl border-2 border-amber-500/60 shadow-2xl shadow-amber-500/30 flex items-center justify-center text-amber-400 hover:scale-105 active:scale-90 transition-all spring-click focus:outline-none"
+            title="Hızlı 1 Dal Terea Ekle (+1)"
+          >
+            <span className="text-2xl select-none filter drop-shadow">🔥</span>
+          </button>
+        </div>
+      )}
+
       {/* Mobile Floating Action & Bottom Bar (Apple Slate) */}
       <nav className="fixed bottom-0 left-0 right-0 z-30 bg-[#0f1014]/90 backdrop-blur-2xl border-t border-[#23252e] px-6 py-2 safe-bottom">
         <div className="max-w-md mx-auto flex items-center justify-between">
@@ -731,7 +851,10 @@ export default function App() {
 
           {/* Center Quick Add FAB */}
           <button
-            onClick={() => setIsAddModalOpen(true)}
+            onClick={() => {
+              setEditingRoutine(null);
+              setIsAddModalOpen(true);
+            }}
             aria-label="Yeni Rutin Ekle"
             className="w-12 h-12 -mt-5 rounded-full bg-white text-black flex items-center justify-center shadow-lg shadow-white/10 hover:bg-neutral-200 transition-all spring-click"
           >
@@ -753,8 +876,10 @@ export default function App() {
       {/* Modals */}
       <QuickAddModal
         isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
+        onClose={handleCloseAddModal}
         onAddRoutine={handleAddRoutine}
+        onUpdateRoutine={handleUpdateRoutine}
+        editingRoutine={editingRoutine}
         existingRoutines={routines}
       />
 

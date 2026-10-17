@@ -194,9 +194,13 @@ export const DEFAULT_ROUTINES = [
 ];
 
 export async function initDatabase() {
-  const count = await db.routines.count();
-  if (count === 0) {
-    await db.routines.bulkAdd(DEFAULT_ROUTINES);
+  const isInitialized = await db.settings.get('hasInitializedRoutines');
+  if (!isInitialized) {
+    const count = await db.routines.count();
+    if (count === 0) {
+      await db.routines.bulkAdd(DEFAULT_ROUTINES);
+    }
+    await db.settings.put({ key: 'hasInitializedRoutines', value: true });
   }
 
   // Seed default settings if not exists

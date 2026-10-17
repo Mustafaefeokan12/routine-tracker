@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
-import { X, Plus, Star, Trash2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Plus, Star, Trash2, Check } from 'lucide-react';
 
 export default function QuickAddModal({
   isOpen,
   onClose,
   onAddRoutine,
+  onUpdateRoutine,
+  editingRoutine = null,
   existingRoutines = []
 }) {
   const [title, setTitle] = useState('');
@@ -28,6 +30,43 @@ export default function QuickAddModal({
   const [subtasks, setSubtasks] = useState([]);
   const [subtaskInput, setSubtaskInput] = useState('');
 
+  // Prefill or reset state on open/edit
+  useEffect(() => {
+    if (editingRoutine) {
+      setTitle(editingRoutine.title || '');
+      setWeight(editingRoutine.weight || 15);
+      setCategory(editingRoutine.category || 'study');
+      setTimeOfDay(editingRoutine.timeOfDay || 'anytime');
+      setDifficulty(editingRoutine.difficulty || 3);
+      setIsRoutine(editingRoutine.isRoutine !== false);
+      setIsMit(!!editingRoutine.isMit);
+      setIsTwoMinuteRule(!!editingRoutine.isTwoMinuteRule);
+      setIsNegative(!!editingRoutine.isNegative);
+      setType(editingRoutine.type || 'boolean');
+      setTargetQuantity(editingRoutine.targetQuantity ? String(editingRoutine.targetQuantity) : '');
+      setUnit(editingRoutine.unit || '');
+      setAnchorRoutineTitle(editingRoutine.anchorRoutineTitle || '');
+      setEisenhower(editingRoutine.eisenhower || 'q2');
+      setSubtasks(editingRoutine.subtasks || []);
+    } else {
+      setTitle('');
+      setWeight(15);
+      setCategory('study');
+      setTimeOfDay('anytime');
+      setDifficulty(3);
+      setIsRoutine(true);
+      setIsMit(false);
+      setIsTwoMinuteRule(false);
+      setIsNegative(false);
+      setType('boolean');
+      setTargetQuantity('');
+      setUnit('');
+      setAnchorRoutineTitle('');
+      setEisenhower('q2');
+      setSubtasks([]);
+    }
+  }, [editingRoutine, isOpen]);
+
   if (!isOpen) return null;
 
   const handleAddSubtask = (e) => {
@@ -48,7 +87,7 @@ export default function QuickAddModal({
     e.preventDefault();
     if (!title.trim()) return;
 
-    onAddRoutine({
+    const routineData = {
       title: title.trim(),
       weight: Number(weight) || 10,
       category,
@@ -64,26 +103,23 @@ export default function QuickAddModal({
       anchorRoutineTitle: anchorRoutineTitle.trim() || null,
       eisenhower: isMit ? 'q1' : isNegative ? 'q4' : isTwoMinuteRule ? 'q3' : eisenhower,
       subtasks: subtasks.length > 0 ? subtasks : undefined,
-      archived: false,
-      order: Date.now()
-    });
+    };
 
-    // Reset Form
-    setTitle('');
-    setWeight(15);
-    setCategory('study');
-    setTimeOfDay('anytime');
-    setDifficulty(3);
-    setIsRoutine(true);
-    setIsMit(false);
-    setIsTwoMinuteRule(false);
-    setIsNegative(false);
-    setType('boolean');
-    setTargetQuantity('');
-    setUnit('');
-    setAnchorRoutineTitle('');
-    setSubtasks([]);
-    setSubtaskInput('');
+    if (editingRoutine) {
+      if (onUpdateRoutine) {
+        onUpdateRoutine({
+          ...editingRoutine,
+          ...routineData
+        });
+      }
+    } else {
+      onAddRoutine({
+        ...routineData,
+        archived: false,
+        order: Date.now()
+      });
+    }
+
     onClose();
   };
 
@@ -93,7 +129,7 @@ export default function QuickAddModal({
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-[#23252e]">
           <h3 className="text-sm font-bold text-white tracking-tight">
-            Yeni Görev / Rutin Ekle
+            {editingRoutine ? 'Rutini / Görevi Düzenle' : 'Yeni Görev / Rutin Ekle'}
           </h3>
           <button
             onClick={onClose}
@@ -435,7 +471,15 @@ export default function QuickAddModal({
             disabled={!title.trim()}
             className="w-full py-3 rounded-xl bg-white hover:bg-neutral-200 disabled:opacity-40 text-black text-sm font-bold flex items-center justify-center gap-2 transition-all spring-click mt-2 shadow-lg"
           >
-            <Plus className="w-4 h-4 stroke-[3]" /> Listeye Ekle
+            {editingRoutine ? (
+              <>
+                <Check className="w-4 h-4 stroke-[3]" /> Değişiklikleri Kaydet
+              </>
+            ) : (
+              <>
+                <Plus className="w-4 h-4 stroke-[3]" /> Listeye Ekle
+              </>
+            )}
           </button>
         </form>
       </div>

@@ -8,6 +8,7 @@ export default function RoutineList({
   quantityMap = {},
   onToggleRoutine,
   onDeleteRoutine,
+  onEditRoutine,
   onOpenAddModal,
   onUpdateQuantity,
   onToggleMit,
@@ -210,6 +211,7 @@ export default function RoutineList({
                     currentQuantity={quantityMap[r.id] || 0}
                     onToggle={onToggleRoutine}
                     onDelete={onDeleteRoutine}
+                    onEdit={onEditRoutine}
                     onUpdateQuantity={onUpdateQuantity}
                     onToggleMit={onToggleMit}
                     onToggleFreeze={onToggleFreeze}
@@ -243,6 +245,7 @@ export default function RoutineList({
                     currentQuantity={quantityMap[r.id] || 0}
                     onToggle={onToggleRoutine}
                     onDelete={onDeleteRoutine}
+                    onEdit={onEditRoutine}
                     onUpdateQuantity={onUpdateQuantity}
                     onToggleMit={onToggleMit}
                     onToggleFreeze={onToggleFreeze}
@@ -276,6 +279,7 @@ export default function RoutineList({
                     currentQuantity={quantityMap[r.id] || 0}
                     onToggle={onToggleRoutine}
                     onDelete={onDeleteRoutine}
+                    onEdit={onEditRoutine}
                     onUpdateQuantity={onUpdateQuantity}
                     onToggleMit={onToggleMit}
                     onToggleFreeze={onToggleFreeze}
@@ -309,6 +313,7 @@ export default function RoutineList({
                     currentQuantity={quantityMap[r.id] || 0}
                     onToggle={onToggleRoutine}
                     onDelete={onDeleteRoutine}
+                    onEdit={onEditRoutine}
                     onUpdateQuantity={onUpdateQuantity}
                     onToggleMit={onToggleMit}
                     onToggleFreeze={onToggleFreeze}
@@ -332,6 +337,7 @@ export default function RoutineList({
                 currentQuantity={quantityMap[r.id] || 0}
                 onToggle={onToggleRoutine}
                 onDelete={onDeleteRoutine}
+                onEdit={onEditRoutine}
                 onUpdateQuantity={onUpdateQuantity}
                 onToggleMit={onToggleMit}
                 onToggleFreeze={onToggleFreeze}
@@ -372,6 +378,7 @@ export default function RoutineList({
                     currentQuantity={quantityMap[r.id] || 0}
                     onToggle={onToggleRoutine}
                     onDelete={onDeleteRoutine}
+                    onEdit={onEditRoutine}
                     onUpdateQuantity={onUpdateQuantity}
                     onToggleMit={onToggleMit}
                     onToggleFreeze={onToggleFreeze}
