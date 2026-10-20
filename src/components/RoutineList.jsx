@@ -124,7 +124,7 @@ export default function RoutineList({
 
       {/* Standard List View Filter Pills (Hidden when Eisenhower is active) */}
       {!isEisenhowerView && (
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
           {filterMode === 'time' ? (
             [
               { id: 'all', label: 'Tümü' },
@@ -137,10 +137,10 @@ export default function RoutineList({
               <button
                 key={tab.id}
                 onClick={() => setActiveTime(tab.id)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all spring-click ${
+                className={`px-4 py-2 rounded-2xl text-sm font-bold whitespace-nowrap transition-all spring-click ${
                   activeTime === tab.id
-                    ? 'bg-white text-black font-bold shadow-sm'
-                    : 'bg-[#17181d] border border-[#262832] text-neutral-400 hover:text-white'
+                    ? 'bg-white text-black font-extrabold shadow-md'
+                    : 'bg-[#17181d] border border-[#282a36] text-neutral-300 hover:text-white'
                 }`}
               >
                 {tab.label}
@@ -160,10 +160,10 @@ export default function RoutineList({
               <button
                 key={tab.id}
                 onClick={() => setActiveCategory(tab.id)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all spring-click ${
+                className={`px-4 py-2 rounded-2xl text-sm font-bold whitespace-nowrap transition-all spring-click ${
                   activeCategory === tab.id
-                    ? 'bg-white text-black font-bold shadow-sm'
-                    : 'bg-[#17181d] border border-[#262832] text-neutral-400 hover:text-white'
+                    ? 'bg-white text-black font-extrabold shadow-md'
+                    : 'bg-[#17181d] border border-[#282a36] text-neutral-300 hover:text-white'
                 }`}
               >
                 {tab.label}
@@ -174,13 +174,13 @@ export default function RoutineList({
       )}
 
       {/* Routine Status Summary */}
-      <div className="flex items-center justify-between text-xs px-1 text-neutral-400">
+      <div className="flex items-center justify-between text-sm px-1 text-neutral-400 font-semibold">
         <span>
-          Tamamlanan: <strong className="text-white">{totalCompleted}</strong> / {routines.length}
+          Tamamlanan: <strong className="text-white font-extrabold">{totalCompleted}</strong> / {routines.length}
         </span>
         {isAllDone && (
-          <span className="text-emerald-400 font-bold flex items-center gap-1">
-            <Sparkles className="w-3.5 h-3.5" /> Tüm liste tamamlandı!
+          <span className="text-emerald-400 font-black flex items-center gap-1.5">
+            <Sparkles className="w-4 h-4" /> Tüm liste tamamlandı!
           </span>
         )}
       </div>
@@ -328,7 +328,7 @@ export default function RoutineList({
         /* Standard Filtered List View */
         <>
           {/* Active / Uncompleted Routines (MIT first!) */}
-          <div className="space-y-2.5">
+          <div className="space-y-3.5">
             {uncompleted.map((r) => (
               <RoutineItem
                 key={r.id}
@@ -361,15 +361,15 @@ export default function RoutineList({
 
           {/* Completed Section Divider */}
           {completed.length > 0 && (
-            <div className="pt-3">
-              <div className="flex items-center gap-2 mb-2 px-1">
-                <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
+            <div className="pt-4">
+              <div className="flex items-center gap-2 mb-3 px-1">
+                <span className="text-sm font-bold uppercase tracking-wider text-neutral-400">
                   Tamamlananlar ({completed.length})
                 </span>
-                <div className="flex-1 h-px bg-[#23252e]"></div>
+                <div className="flex-1 h-px bg-[#262833]"></div>
               </div>
 
-              <div className="space-y-2.5">
+              <div className="space-y-3.5">
                 {completed.map((r) => (
                   <RoutineItem
                     key={r.id}

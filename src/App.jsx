@@ -52,32 +52,33 @@ export default function App() {
   const [isBadgesModalOpen, setIsBadgesModalOpen] = useState(false);
   const [selectedDay, setSelectedDay] = useState(null);
 
-  // Load all data from IndexedDB
+  // Load all data from IndexedDB in high-speed parallel batches
   const loadData = useCallback(async () => {
     await initDatabase();
 
-    // Load Settings
-    const targetSet = await db.settings.get('dailyTarget');
-    const targetVal = targetSet ? targetSet.value : 100;
+    // Fetch settings in single fast query
+    const settingsArr = await db.settings.toArray();
+    const settingsMap = {};
+    settingsArr.forEach((s) => {
+      settingsMap[s.key] = s.value;
+    });
+
+    const targetVal = settingsMap.dailyTarget ?? 100;
     setTargetScore(targetVal);
 
-    const resetSet = await db.settings.get('resetHour');
-    const resetVal = resetSet ? resetSet.value : 4;
+    const resetVal = settingsMap.resetHour ?? 4;
     setResetHour(resetVal);
 
-    const priceSet = await db.settings.get('tereaStickPrice');
-    const priceVal = priceSet ? priceSet.value : 6.0;
+    const priceVal = settingsMap.tereaStickPrice ?? 6.0;
     setTereaPrice(priceVal);
 
-    const soundSet = await db.settings.get('soundEnabled');
-    setSoundEnabled(soundSet ? soundSet.value : true);
+    const soundVal = settingsMap.soundEnabled ?? true;
+    setSoundEnabled(soundVal);
 
     // Load Security PIN settings
-    const pinEnabledSet = await db.settings.get('pinEnabled');
-    const pinHashSet = await db.settings.get('pinHash');
-    const hasPin = !!(pinEnabledSet?.value && pinHashSet?.value);
+    const hasPin = !!(settingsMap.pinEnabled && settingsMap.pinHash);
     setPinEnabled(hasPin);
-    setStoredPinHash(pinHashSet?.value || '');
+    setStoredPinHash(settingsMap.pinHash || '');
     if (hasPin) {
       setIsAppLocked((prev) => (isPinCheckedRef.current ? prev : true));
     } else {
@@ -88,14 +89,18 @@ export default function App() {
     const currentToday = getTodayString(resetVal);
     setTodayStr(currentToday);
 
-    // Load Routines
-    const activeRoutines = await db.routines
-      .filter((r) => !r.archived)
-      .sortBy('order');
+    // High-speed parallel fetch for routines, logs, and day records
+    const [activeRoutines, todayLogs, todayDayRecord, allDays, allLogs] = await Promise.all([
+      db.routines.filter((r) => !r.archived).sortBy('order'),
+      db.logs.where('date').equals(currentToday).toArray(),
+      db.days.get(currentToday),
+      db.days.toArray(),
+      db.logs.toArray()
+    ]);
+
     setRoutines(activeRoutines);
 
-    // Load Today's Completed Routine Logs
-    const todayLogs = await db.logs.where('date').equals(currentToday).toArray();
+    // Today's Completed Routine Logs
     const map = {};
     const qMap = {};
     let score = 0;
@@ -110,13 +115,11 @@ export default function App() {
     setQuantityMap((prev) => ({ ...prev, ...qMap }));
     setCurrentScore(score);
 
-    // Load Today's Terea Sticks
-    const todayDayRecord = await db.days.get(currentToday);
+    // Today's Terea Sticks
     const sticks = todayDayRecord?.tereaCount || 0;
     setTodayTereaSticks(sticks);
 
     // Load All Days for Heatmap & Streak
-    const allDays = await db.days.toArray();
     const dMap = {};
     allDays.forEach((d) => {
       dMap[d.date] = d;
@@ -133,7 +136,6 @@ export default function App() {
     setDaysMap(dMap);
 
     // Compute Category Breakdown Map for Heatmap
-    const allLogs = await db.logs.toArray();
     const routinesMap = {};
     activeRoutines.forEach((r) => {
       routinesMap[r.id] = r;
@@ -776,13 +778,13 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setShowTereaDetails((prev) => !prev)}
-                className="w-full py-2.5 px-4 rounded-2xl bg-[#14151a] border border-[#23252e] hover:border-neutral-700 text-xs font-semibold text-neutral-400 hover:text-white flex items-center justify-between transition-all"
+                className="w-full py-3.5 px-5 rounded-2xl bg-[#14151a] border border-[#23252e] hover:border-neutral-600 text-sm font-bold text-neutral-300 hover:text-white flex items-center justify-between transition-all spring-click"
               >
-                <span className="flex items-center gap-2">
-                  <span>🔥</span>
+                <span className="flex items-center gap-2.5">
+                  <span className="text-base">🔥</span>
                   <span>Terea Harcama & Detay Analizi</span>
                 </span>
-                <span className="text-neutral-400 font-mono text-[11px] privacy-blur">
+                <span className="text-neutral-300 font-mono text-xs font-bold privacy-blur">
                   {showTereaDetails ? 'Gizle ▲' : `${todayTereaSticks} Dal • ${(todayTereaSticks * tereaPrice).toFixed(0)} TL ▼`}
                 </span>
               </button>
@@ -815,11 +817,11 @@ export default function App() {
         )}
       </main>
 
-      {/* Floating Fast Terea Counter Button (Flame FAB) */}
+      {/* Floating Fast Terea Counter Button (Flame FAB - Enlarged & Tactile) */}
       {currentView === 'routines' && (
-        <div className="fixed bottom-20 right-4 z-40 flex flex-col items-end pointer-events-auto">
+        <div className="fixed bottom-24 right-5 z-40 flex flex-col items-end pointer-events-auto">
           {showFlameToast && (
-            <div className="mb-2 px-3 py-1.5 rounded-full bg-amber-500 text-black text-xs font-black shadow-xl animate-bounce pointer-events-none flex items-center gap-1">
+            <div className="mb-2.5 px-3.5 py-2 rounded-full bg-amber-500 text-black text-sm font-black shadow-2xl animate-bounce pointer-events-none flex items-center gap-1.5">
               <span>+1 Dal Eklendi</span>
               <span>🔥</span>
             </div>
@@ -828,47 +830,47 @@ export default function App() {
             type="button"
             onClick={handleFastTereaClick}
             aria-label="1 Dal Terea Ekle"
-            className="w-14 h-14 rounded-full bg-[#181920]/95 backdrop-blur-xl border-2 border-amber-500/60 shadow-2xl shadow-amber-500/30 flex items-center justify-center text-amber-400 hover:scale-105 active:scale-90 transition-all spring-click focus:outline-none"
+            className="w-16 h-16 rounded-full bg-[#181920]/95 backdrop-blur-xl border-2 border-amber-500/70 shadow-2xl shadow-amber-500/40 flex items-center justify-center text-amber-400 hover:scale-105 active:scale-90 transition-all spring-click focus:outline-none"
             title="Hızlı 1 Dal Terea Ekle (+1)"
           >
-            <span className="text-2xl select-none filter drop-shadow">🔥</span>
+            <span className="text-3xl select-none filter drop-shadow">🔥</span>
           </button>
         </div>
       )}
 
-      {/* Mobile Floating Action & Bottom Bar (Apple Slate) */}
-      <nav className="fixed bottom-0 left-0 right-0 z-30 bg-[#0f1014]/90 backdrop-blur-2xl border-t border-[#23252e] px-6 py-2 safe-bottom">
+      {/* Mobile Floating Action & Bottom Bar (More Accessible & Larger Touch Targets) */}
+      <nav className="fixed bottom-0 left-0 right-0 z-30 bg-[#0f1014]/95 backdrop-blur-2xl border-t border-[#23252e] px-8 py-2.5 safe-bottom">
         <div className="max-w-md mx-auto flex items-center justify-between">
           <button
             onClick={() => setCurrentView('routines')}
-            className={`flex flex-col items-center gap-1 transition-colors spring-click ${
-              currentView === 'routines' ? 'text-white' : 'text-neutral-500 hover:text-neutral-300'
+            className={`flex flex-col items-center gap-1.5 p-2 rounded-2xl transition-colors spring-click ${
+              currentView === 'routines' ? 'text-white' : 'text-neutral-400 hover:text-neutral-200'
             }`}
           >
-            <CheckSquare className="w-5 h-5" />
-            <span className="text-[10px] font-bold">Görevler</span>
+            <CheckSquare className="w-6 h-6 stroke-[2.5]" />
+            <span className="text-xs font-black tracking-tight">Görevler</span>
           </button>
 
-          {/* Center Quick Add FAB */}
+          {/* Center Quick Add FAB (Larger & More Accessible) */}
           <button
             onClick={() => {
               setEditingRoutine(null);
               setIsAddModalOpen(true);
             }}
             aria-label="Yeni Rutin Ekle"
-            className="w-12 h-12 -mt-5 rounded-full bg-white text-black flex items-center justify-center shadow-lg shadow-white/10 hover:bg-neutral-200 transition-all spring-click"
+            className="w-14 h-14 -mt-7 rounded-full bg-white text-black flex items-center justify-center shadow-xl shadow-white/15 hover:bg-neutral-200 active:scale-95 transition-all spring-click"
           >
-            <Plus className="w-6 h-6 stroke-[3]" />
+            <Plus className="w-7 h-7 stroke-[3]" />
           </button>
 
           <button
             onClick={() => setCurrentView('tracker')}
-            className={`flex flex-col items-center gap-1 transition-colors spring-click ${
-              currentView === 'tracker' ? 'text-emerald-400' : 'text-neutral-500 hover:text-neutral-300'
+            className={`flex flex-col items-center gap-1.5 p-2 rounded-2xl transition-colors spring-click ${
+              currentView === 'tracker' ? 'text-emerald-400' : 'text-neutral-400 hover:text-neutral-200'
             }`}
           >
-            <BarChart2 className="w-5 h-5" />
-            <span className="text-[10px] font-bold">Geçmiş & Isı</span>
+            <BarChart2 className="w-6 h-6 stroke-[2.5]" />
+            <span className="text-xs font-black tracking-tight">Geçmiş & Isı</span>
           </button>
         </div>
       </nav>

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'routinetrack-v2.3';
+const CACHE_NAME = 'routinetrack-v2.4';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -55,22 +55,32 @@ self.addEventListener('fetch', (event) => {
     (event.request.headers.get('accept') && event.request.headers.get('accept').includes('text/html'));
 
   if (isNavigation) {
-    // Network-first with cache: 'no-cache' to force conditional origin validation (bypasses max-age: 600 disk cache)
+    // Instant launch: Serve cached shell immediately in <15ms, revalidate in background
     event.respondWith(
-      fetch(new Request(event.request, { cache: 'no-cache' }))
-        .then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
-            const copy = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+      caches.match(event.request).then((cached) => {
+        const networkFetch = fetch(new Request(event.request, { cache: 'no-cache' }))
+          .then((networkResponse) => {
+            if (networkResponse && networkResponse.status === 200) {
+              const copy = networkResponse.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+            }
+            return networkResponse;
+          })
+          .catch(() => null);
+
+        if (cached) {
+          event.waitUntil(networkFetch);
+          return cached;
+        }
+
+        return caches.match('./index.html').then((shell) => {
+          if (shell) {
+            event.waitUntil(networkFetch);
+            return shell;
           }
-          return networkResponse;
-        })
-        .catch(() => {
-          // Offline fallback
-          return caches.match(event.request).then((cached) => {
-            return cached || caches.match('./index.html') || caches.match('./');
-          });
-        })
+          return networkFetch;
+        });
+      })
     );
     return;
   }

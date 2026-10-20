@@ -125,24 +125,24 @@ export default function RoutineItem({
               handleToggle();
             }
           }}
-          className={`mt-0.5 flex-shrink-0 w-6 h-6 rounded-lg border flex items-center justify-center transition-all ${
+          className={`mt-0.5 flex-shrink-0 w-8 h-8 rounded-xl border-2 flex items-center justify-center transition-all spring-click ${
             isCompleted
               ? routine.isNegative
-                ? 'bg-emerald-500 border-emerald-500 text-black shadow-sm'
-                : 'bg-emerald-500 border-emerald-500 text-black shadow-sm'
+                ? 'bg-emerald-500 border-emerald-500 text-black shadow-md'
+                : 'bg-emerald-500 border-emerald-500 text-black shadow-md'
               : routine.isNegative
               ? 'border-neutral-700 bg-neutral-900 text-neutral-400 hover:border-neutral-500'
-              : 'border-[#363946] bg-[#1a1c22] hover:border-neutral-400 text-transparent'
+              : 'border-[#383b49] bg-[#1a1c24] hover:border-neutral-300 text-transparent'
           }`}
         >
-          <Check className={`w-3.5 h-3.5 stroke-[3] transition-transform ${isCompleted ? 'scale-100' : 'scale-0'}`} />
+          <Check className={`w-5 h-5 stroke-[3] transition-transform ${isCompleted ? 'scale-100' : 'scale-0'}`} />
         </button>
 
         {/* Routine Content */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <p
-              className={`text-sm font-semibold tracking-tight transition-all break-words privacy-blur ${
+              className={`text-base font-bold tracking-tight transition-all break-words privacy-blur leading-snug ${
                 isCompleted ? 'line-through text-neutral-500' : 'text-neutral-100'
               }`}
             >
@@ -151,35 +151,35 @@ export default function RoutineItem({
 
             {/* MIT Star Badge */}
             {routine.isMit && (
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-neutral-800 text-amber-300 border border-neutral-700 flex items-center gap-1">
+              <span className="text-xs font-black px-2 py-0.5 rounded-lg bg-neutral-800 text-amber-300 border border-neutral-700 flex items-center gap-1 shadow-sm">
                 ⭐ MIT
               </span>
             )}
 
             {/* 2-Minute Rule Tag */}
             {routine.isTwoMinuteRule && (
-              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-neutral-800 text-neutral-300 border border-neutral-700 flex items-center gap-0.5">
+              <span className="text-xs font-bold px-2 py-0.5 rounded-lg bg-neutral-800 text-cyan-300 border border-neutral-700 flex items-center gap-1">
                 ⚡ 2-Dk
               </span>
             )}
 
             {/* Negative Habit Badge */}
             {routine.isNegative && (
-              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-neutral-800 text-neutral-300 border border-neutral-700 flex items-center gap-1">
-                <ShieldAlert className="w-3 h-3 text-neutral-400" />
+              <span className="text-xs font-bold px-2 py-0.5 rounded-lg bg-neutral-800 text-neutral-300 border border-neutral-700 flex items-center gap-1">
+                <ShieldAlert className="w-3.5 h-3.5 text-neutral-400" />
                 {isCompleted ? 'Direnildi ✅' : 'Direnme'}
               </span>
             )}
 
             {/* Routine Freeze Badge */}
             {routine.isFrozen && (
-              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-neutral-800 text-neutral-300 border border-neutral-700 flex items-center gap-1">
-                <Snowflake className="w-3 h-3" /> Donduruldu
+              <span className="text-xs font-bold px-2 py-0.5 rounded-lg bg-neutral-800 text-cyan-300 border border-neutral-700 flex items-center gap-1">
+                <Snowflake className="w-3.5 h-3.5" /> Donduruldu
               </span>
             )}
 
             {!routine.isRoutine && (
-              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-neutral-800 text-neutral-400 border border-neutral-700">
+              <span className="text-xs font-bold px-2 py-0.5 rounded-lg bg-neutral-800 text-neutral-400 border border-neutral-700">
                 To-Do
               </span>
             )}
@@ -187,23 +187,23 @@ export default function RoutineItem({
 
           {/* Habit Stacking Indicator */}
           {routine.anchorRoutineTitle && (
-            <div className="flex items-center gap-1.5 text-[10px] font-medium text-cyan-400/90 bg-cyan-950/30 border border-cyan-800/40 px-2 py-0.5 rounded-lg w-fit mt-1.5">
-              <Link2 className="w-3 h-3" />
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-cyan-400/90 bg-cyan-950/40 border border-cyan-800/50 px-2.5 py-1 rounded-xl w-fit mt-2">
+              <Link2 className="w-3.5 h-3.5" />
               <span>Zincir: {routine.anchorRoutineTitle} ➔ {routine.title}</span>
             </div>
           )}
 
           {/* Badges / Metadata row */}
-          <div className="flex items-center gap-2 mt-1.5 text-xs flex-wrap">
+          <div className="flex items-center gap-2.5 mt-2 text-xs flex-wrap">
             {/* Category Pill */}
-            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${cat.color}`}>
+            <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${cat.color}`}>
               {cat.label}
             </span>
 
             {/* Time Block */}
             {routine.timeOfDay && (
-              <span className="text-[10px] font-medium text-neutral-400 flex items-center gap-1">
-                <Clock className="w-2.5 h-2.5" />
+              <span className="text-xs font-bold text-neutral-400 flex items-center gap-1">
+                <Clock className="w-3 h-3" />
                 {TIME_MAP[routine.timeOfDay] || routine.timeOfDay}
               </span>
             )}
@@ -212,7 +212,7 @@ export default function RoutineItem({
             {routine.difficulty > 0 && (
               <div className="flex items-center text-amber-400/80">
                 {[...Array(routine.difficulty)].map((_, i) => (
-                  <Star key={i} className="w-2.5 h-2.5 fill-amber-400/80" />
+                  <Star key={i} className="w-3 h-3 fill-amber-400/80" />
                 ))}
               </div>
             )}
@@ -225,16 +225,16 @@ export default function RoutineItem({
                   e.stopPropagation();
                   setSubtasksOpen((prev) => !prev);
                 }}
-                className="text-[10px] font-semibold px-2 py-0.5 rounded-lg bg-[#20222a] border border-[#2e313d] text-neutral-300 hover:text-white flex items-center gap-1 transition-colors"
+                className="text-xs font-bold px-2.5 py-1 rounded-xl bg-[#20222a] border border-[#2e313d] text-neutral-200 hover:text-white flex items-center gap-1.5 transition-colors spring-click"
               >
                 <span>{completedSubtasksCount}/{subtasks.length} alt görev</span>
-                {subtasksOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                {subtasksOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
               </button>
             )}
           </div>
         </div>
 
-        {/* Right Side: MIT Star, Freeze, Score Pill & Action */}
+        {/* Right Side: MIT Star, Freeze, Score Pill & Action Buttons (Larger touch targets) */}
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {/* Interactive MIT Toggle Star */}
           {onToggleMit && (
@@ -245,14 +245,14 @@ export default function RoutineItem({
                 e.stopPropagation();
                 onToggleMit(routine);
               }}
-              className={`p-1 rounded-lg border transition-all spring-click ${
+              className={`p-2 rounded-xl border transition-all spring-click ${
                 routine.isMit
                   ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
-                  : 'border-transparent text-neutral-600 hover:text-amber-400 hover:bg-[#20222a]'
+                  : 'border-transparent text-neutral-500 hover:text-amber-400 hover:bg-[#20222a]'
               }`}
               title={routine.isMit ? 'Günün En Önemli Görevi (MIT)' : 'MIT Olarak İşaretle'}
             >
-              <Star className={`w-3.5 h-3.5 ${routine.isMit ? 'fill-amber-400 text-amber-400' : ''}`} />
+              <Star className={`w-4 h-4 ${routine.isMit ? 'fill-amber-400 text-amber-400' : ''}`} />
             </button>
           )}
 
@@ -265,20 +265,20 @@ export default function RoutineItem({
                 e.stopPropagation();
                 onToggleFreeze(routine);
               }}
-              className={`p-1 rounded-lg border transition-all spring-click ${
+              className={`p-2 rounded-xl border transition-all spring-click ${
                 routine.isFrozen
                   ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300'
-                  : 'border-transparent text-neutral-600 hover:text-cyan-400 hover:bg-[#20222a]'
+                  : 'border-transparent text-neutral-500 hover:text-cyan-400 hover:bg-[#20222a]'
               }`}
               title={routine.isFrozen ? 'Dondurmayı Kaldır' : 'Rutini Dondur (Muafiyet)'}
             >
-              <Snowflake className="w-3.5 h-3.5" />
+              <Snowflake className="w-4 h-4" />
             </button>
           )}
 
           {/* Score Pill */}
           <span
-            className={`text-xs font-bold px-2.5 py-1 rounded-xl border transition-colors ${
+            className={`text-xs font-black px-2.5 py-1.5 rounded-xl border transition-colors ${
               isCompleted
                 ? 'bg-emerald-950/30 text-emerald-400/80 border-emerald-900/40'
                 : 'bg-[#20222a] text-emerald-400 border-[#2e313d]'
@@ -296,10 +296,10 @@ export default function RoutineItem({
                 e.stopPropagation();
                 onEdit(routine);
               }}
-              className="p-1.5 rounded-lg text-neutral-400 hover:text-white active:text-white hover:bg-[#20222a] transition-colors spring-click"
+              className="p-2.5 rounded-xl text-neutral-300 hover:text-white active:text-white bg-[#1e2029] border border-[#2b2e3c] hover:border-neutral-500 transition-colors spring-click"
               title="Görevi Düzenle"
             >
-              <Pencil className="w-3.5 h-3.5" />
+              <Pencil className="w-4 h-4" />
             </button>
           )}
 
@@ -313,7 +313,7 @@ export default function RoutineItem({
                 onDelete(routine.id);
               }
             }}
-            className="p-1.5 rounded-lg text-neutral-400 hover:text-rose-400 active:text-rose-400 hover:bg-[#20222a] transition-colors spring-click"
+            className="p-2.5 rounded-xl text-neutral-400 hover:text-rose-400 active:text-rose-400 bg-[#1e2029] border border-[#2b2e3c] hover:border-rose-900 transition-colors spring-click"
             title="Görevi Sil"
           >
             <Trash2 className="w-4 h-4" />

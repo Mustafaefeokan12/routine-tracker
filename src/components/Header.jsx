@@ -22,73 +22,73 @@ export default function Header({
   const todayTereaSpent = (todayTereaSticks * tereaPrice).toFixed(0);
 
   return (
-    <header className="sticky top-0 z-20 bg-[#0f1014]/90 backdrop-blur-2xl border-b border-[#23252e] px-4 pt-3 pb-3 safe-top">
+    <header className="sticky top-0 z-20 bg-[#0f1014]/90 backdrop-blur-2xl border-b border-[#23252e] px-4 pt-3.5 pb-3.5 safe-top">
       <div className="max-w-md mx-auto">
         {/* Top Info Row */}
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-3.5">
           <div>
             <div className="flex items-center gap-2">
-              <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <p className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <p className="text-sm font-bold uppercase tracking-wider text-neutral-400">
                 {formatDateDisplay(todayStr)}
               </p>
             </div>
-            <h1 className="text-xl font-bold tracking-tight text-white mt-0.5 flex items-center gap-2">
+            <h1 className="text-2xl font-black tracking-tight text-white mt-1 flex items-center gap-2">
               Günlük Rutinler
-              <span className="text-[10px] font-semibold tracking-normal px-1.5 py-0.5 rounded-full bg-[#1e2029] text-neutral-400 border border-[#2d303d]">v2.3</span>
+              <span className="text-xs font-bold tracking-normal px-2 py-0.5 rounded-full bg-[#1e2029] text-neutral-300 border border-[#2d303d]">v2.4</span>
             </h1>
           </div>
 
-          {/* Right Action Icons */}
-          <div className="flex items-center gap-1.5">
+          {/* Right Action Icons (Larger, accessible touch targets) */}
+          <div className="flex items-center gap-2">
             <button
               onClick={onTogglePrivacy}
               aria-label="Gizlilik Kalkanı"
-              className={`p-2.5 rounded-xl border transition-all spring-click ${
+              className={`p-3 rounded-2xl border transition-all spring-click ${
                 privacyMode
-                  ? 'bg-cyan-950/50 border-cyan-700/60 text-cyan-300 shadow-sm shadow-cyan-500/20'
-                  : 'bg-[#17181d] border-[#23252e] text-neutral-300 hover:text-white'
+                  ? 'bg-cyan-950/60 border-cyan-700/70 text-cyan-300 shadow-sm shadow-cyan-500/20'
+                  : 'bg-[#17181d] border-[#262832] text-neutral-200 hover:text-white'
               }`}
               title={privacyMode ? 'Gizlilik Kalkanı Aktif (Bulanık)' : 'Gizlilik Kalkanını Aç'}
             >
-              {privacyMode ? <EyeOff className="w-5 h-5 text-cyan-400" /> : <Eye className="w-5 h-5" />}
+              {privacyMode ? <EyeOff className="w-5 h-5 text-cyan-400 stroke-[2.5]" /> : <Eye className="w-5 h-5 stroke-[2.5]" />}
             </button>
             <button
               onClick={onOpenBadges}
               aria-label="Rozetler & Seviye"
-              className="p-2.5 rounded-xl bg-[#17181d] border border-[#23252e] text-amber-400 hover:text-amber-300 spring-click"
+              className="p-3 rounded-2xl bg-[#17181d] border border-[#262832] text-amber-400 hover:text-amber-300 spring-click"
               title="Seviye ve Rozetler"
             >
-              <Trophy className="w-5 h-5" />
+              <Trophy className="w-5 h-5 stroke-[2.5]" />
             </button>
             <button
               onClick={onToggleView}
               aria-label="Görünüm Değiştir"
-              className={`p-2.5 rounded-xl border transition-all spring-click ${
+              className={`p-3 rounded-2xl border transition-all spring-click ${
                 currentView === 'tracker'
                   ? 'bg-[#23252e] border-[#363945] text-emerald-400'
-                  : 'bg-[#17181d] border-[#23252e] text-neutral-300 hover:text-white'
+                  : 'bg-[#17181d] border-[#262832] text-neutral-200 hover:text-white'
               }`}
               title="Aktivite Isı Haritası"
             >
-              <BarChart3 className="w-5 h-5" />
+              <BarChart3 className="w-5 h-5 stroke-[2.5]" />
             </button>
             <button
               onClick={onOpenSettings}
               aria-label="Ayarlar"
-              className="p-2.5 rounded-xl bg-[#17181d] border border-[#23252e] text-neutral-300 hover:text-white spring-click"
+              className="p-3 rounded-2xl bg-[#17181d] border border-[#262832] text-neutral-200 hover:text-white spring-click"
               title="Ayarlar"
             >
-              <SettingsIcon className="w-5 h-5" />
+              <SettingsIcon className="w-5 h-5 stroke-[2.5]" />
             </button>
           </div>
         </div>
 
-        {/* Daily Score & Streak Banner */}
-        <div className="bg-[#17181d] border border-[#262832] rounded-2xl p-3.5 flex items-center justify-between shadow-lg shadow-black/40">
-          <div className="flex items-center gap-3.5">
+        {/* Daily Score & Streak Banner (Generous padding, high contrast) */}
+        <div className="bg-[#16171e] border border-[#262832] rounded-3xl p-4 flex items-center justify-between shadow-xl shadow-black/40">
+          <div className="flex items-center gap-4">
             {/* Circular Progress Ring */}
-            <div className="relative w-14 h-14 flex items-center justify-center">
+            <div className="relative w-16 h-16 flex items-center justify-center flex-shrink-0">
               <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
                 <path
                   className="text-[#262832]"
@@ -108,50 +108,50 @@ export default function Header({
                 />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-sm font-extrabold text-white leading-none">
+                <span className="text-base font-black text-white leading-none">
                   %{percentage}
                 </span>
               </div>
             </div>
 
             <div>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl font-black tracking-tight text-white privacy-blur">
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-black tracking-tight text-white privacy-blur">
                   {currentScore}
                 </span>
-                <span className="text-xs font-semibold text-neutral-400">
+                <span className="text-sm font-bold text-neutral-400">
                   / {targetScore} P
                 </span>
                 {isOverachieved && (
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  <span className="text-xs font-black px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
                     +Bonus
                   </span>
                 )}
               </div>
-              <p className="text-xs text-neutral-400 mt-0.5">
+              <p className="text-xs font-semibold text-neutral-300 mt-1">
                 {currentScore >= targetScore
-                  ? '🎯 Hedef aşıldı!'
+                  ? '🎯 Günlük hedef aşıldı!'
                   : `Hedefe ${targetScore - currentScore} puan kaldı`}
               </p>
             </div>
           </div>
 
           {/* Right Stats: Streak & Terea Quick Pill */}
-          <div className="flex flex-col items-end gap-1.5 pl-3 border-l border-[#262832]">
+          <div className="flex flex-col items-end gap-2 pl-3 border-l border-[#262832]">
             {/* Streak */}
             <div className="flex items-center gap-1.5">
               <Flame className="w-4 h-4 text-orange-400 fill-orange-400/20" />
-              <span className="text-xs font-bold text-white font-mono">
+              <span className="text-sm font-bold text-white font-mono">
                 {streak} Gün {freezeUsed && <span title="Dondurma Koruması">❄️</span>}
               </span>
             </div>
 
-            {/* Terea Quick Pill */}
-            <div className="px-2.5 py-1 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs font-bold text-amber-400 font-mono privacy-blur flex items-center gap-1.5 shadow-sm">
-              <span className="text-xs">🔥</span>
+            {/* Terea Quick Pill (Larger, bolder, high contrast) */}
+            <div className="px-3 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-sm font-black text-amber-400 font-mono privacy-blur flex items-center gap-1.5 shadow-sm">
+              <span className="text-sm">🔥</span>
               <span>{todayTereaSticks} Dal</span>
-              <span className="text-neutral-500 font-normal">•</span>
-              <span className="text-neutral-200">{todayTereaSpent} TL</span>
+              <span className="text-amber-500/40 font-normal">•</span>
+              <span className="text-neutral-100">{todayTereaSpent} TL</span>
             </div>
           </div>
         </div>

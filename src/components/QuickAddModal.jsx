@@ -127,26 +127,26 @@ export default function QuickAddModal({
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md animate-fade-in">
       <div className="w-full max-w-md bg-[#17181d] border border-[#262832] rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar">
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-[#23252e]">
-          <h3 className="text-sm font-bold text-white tracking-tight">
+        <div className="flex items-center justify-between pb-3.5 border-b border-[#23252e]">
+          <h3 className="text-base font-black text-white tracking-tight">
             {editingRoutine ? 'Rutini / Görevi Düzenle' : 'Yeni Görev / Rutin Ekle'}
           </h3>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-xl bg-[#23252e] text-neutral-400 hover:text-white"
+            className="p-2 rounded-xl bg-[#23252e] text-neutral-300 hover:text-white"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
           {/* Routine vs Single To-Do Switch */}
-          <div className="grid grid-cols-2 p-1 rounded-xl bg-[#121316] border border-[#262832] text-xs font-semibold">
+          <div className="grid grid-cols-2 p-1.5 rounded-2xl bg-[#121316] border border-[#262832] text-sm font-bold">
             <button
               type="button"
               onClick={() => setIsRoutine(true)}
-              className={`py-2 rounded-lg transition-all ${
-                isRoutine ? 'bg-[#2e313e] text-white font-bold shadow' : 'text-neutral-400 hover:text-white'
+              className={`py-2.5 rounded-xl transition-all ${
+                isRoutine ? 'bg-[#2e313e] text-white font-extrabold shadow' : 'text-neutral-400 hover:text-white'
               }`}
             >
               🔄 Günlük Rutin (Tekrarlı)
@@ -154,8 +154,8 @@ export default function QuickAddModal({
             <button
               type="button"
               onClick={() => setIsRoutine(false)}
-              className={`py-2 rounded-lg transition-all ${
-                !isRoutine ? 'bg-[#2e313e] text-white font-bold shadow' : 'text-neutral-400 hover:text-white'
+              className={`py-2.5 rounded-xl transition-all ${
+                !isRoutine ? 'bg-[#2e313e] text-white font-extrabold shadow' : 'text-neutral-400 hover:text-white'
               }`}
             >
               📌 Tekil To-Do (Bugünlük)
@@ -164,7 +164,7 @@ export default function QuickAddModal({
 
           {/* Title Input */}
           <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5">
+            <label className="block text-xs font-black uppercase tracking-wider text-neutral-400 mb-1.5">
               Başlık
             </label>
             <input
@@ -173,7 +173,7 @@ export default function QuickAddModal({
               placeholder="Örn: 45 Dk Odaklı Mühendislik..."
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full bg-[#121316] border border-[#262832] rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-neutral-500 transition-colors"
+              className="w-full bg-[#121316] border border-[#262832] rounded-xl px-4 py-3 text-base font-semibold text-white placeholder-neutral-600 focus:outline-none focus:border-neutral-500 transition-colors"
             />
           </div>
 
@@ -469,15 +469,15 @@ export default function QuickAddModal({
           <button
             type="submit"
             disabled={!title.trim()}
-            className="w-full py-3 rounded-xl bg-white hover:bg-neutral-200 disabled:opacity-40 text-black text-sm font-bold flex items-center justify-center gap-2 transition-all spring-click mt-2 shadow-lg"
+            className="w-full py-3.5 rounded-2xl bg-white hover:bg-neutral-200 disabled:opacity-40 text-black text-base font-black flex items-center justify-center gap-2.5 transition-all spring-click mt-3 shadow-xl active:scale-98"
           >
             {editingRoutine ? (
               <>
-                <Check className="w-4 h-4 stroke-[3]" /> Değişiklikleri Kaydet
+                <Check className="w-5 h-5 stroke-[3]" /> Değişiklikleri Kaydet
               </>
             ) : (
               <>
-                <Plus className="w-4 h-4 stroke-[3]" /> Listeye Ekle
+                <Plus className="w-5 h-5 stroke-[3]" /> Listeye Ekle
               </>
             )}
           </button>
