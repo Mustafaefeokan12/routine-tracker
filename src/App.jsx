@@ -20,6 +20,7 @@ import YemekKartiSheet from './components/YemekKartiSheet';
 import AddExpenseSheet from './components/AddExpenseSheet';
 import UndoToast from './components/UndoToast';
 import AnalyticsModal from './components/AnalyticsModal';
+import HistoryModal from './components/HistoryModal';
 import SettingsModal from './components/SettingsModal';
 import { Plus } from 'lucide-react';
 
@@ -30,6 +31,7 @@ export default function App() {
   const [isLoaded, setIsLoaded] = useState(false);
 
   // Modals
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isYemekKartiOpen, setIsYemekKartiOpen] = useState(false);
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
@@ -94,8 +96,8 @@ export default function App() {
     }
   }, [isDark]);
 
-  // Financial Metrics Computation
-  const todayStr = useMemo(() => getTodayString(), []);
+  // Financial Metrics Computation with 06:00 AM Day Boundary
+  const todayStr = useMemo(() => getTodayString(new Date(), 6), []);
 
   const metrics = useMemo(() => {
     return computeBudgetMetrics({
@@ -104,12 +106,25 @@ export default function App() {
       salaryDay: settings.salaryDay,
       currentBalance: settings.currentBalance,
       balanceSetDate: settings.balanceSetDate,
+      resetHour: 6,
       targetDate: new Date()
     });
   }, [expenses, settings.monthlyIncome, settings.salaryDay, settings.currentBalance, settings.balanceSetDate]);
 
+  // Daily Spending History for Calendar Modal
+  const history = useMemo(() => {
+    return computeDailyHistory({
+      expenses,
+      dailyAllowance: metrics.dailyAllowance,
+      targetDate: new Date(),
+      resetHour: 6,
+      daysCount: 16
+    });
+  }, [expenses, metrics.dailyAllowance]);
+
   // 1. Add IQOS Quick Expense
   const handleAddIqos = async () => {
+    const currentLogicalToday = getTodayString(new Date(), 6);
     const newExp = {
       title: 'IQOS (1 Paket)',
       amount: settings.iqosPrice || 220,
@@ -117,7 +132,7 @@ export default function App() {
       categoryIcon: '🚬',
       isQuick: true,
       timestamp: Date.now(),
-      date: todayStr
+      date: currentLogicalToday
     };
 
     const id = await db.expenses.add(newExp);
@@ -128,10 +143,11 @@ export default function App() {
 
   // 2. Add Yemek Karti Expense
   const handleSaveYemekKarti = async (expData) => {
+    const currentLogicalToday = getTodayString(new Date(), 6);
     const newExp = {
       ...expData,
       timestamp: Date.now(),
-      date: todayStr
+      date: currentLogicalToday
     };
 
     const id = await db.expenses.add(newExp);
@@ -142,10 +158,11 @@ export default function App() {
 
   // 3. Add Custom / Serbest Expense
   const handleSaveCustomExpense = async (expData) => {
+    const currentLogicalToday = getTodayString(new Date(), 6);
     const newExp = {
       ...expData,
       timestamp: Date.now(),
-      date: todayStr
+      date: currentLogicalToday
     };
 
     const id = await db.expenses.add(newExp);
@@ -214,6 +231,7 @@ export default function App() {
       <main className="max-w-md mx-auto px-4 safe-top">
         {/* Navigation Header */}
         <Header
+          onOpenHistory={() => setIsHistoryOpen(true)}
           onOpenAnalytics={() => setIsAnalyticsOpen(true)}
           onOpenSettings={() => setIsSettingsOpen(true)}
           isDark={isDark}
@@ -282,6 +300,14 @@ export default function App() {
         onClose={() => setIsAddExpenseOpen(false)}
         onSave={handleSaveCustomExpense}
         recentSuggestions={suggestions}
+        isDark={isDark}
+      />
+
+      {/* Calendar History Modal */}
+      <HistoryModal
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        history={history}
         isDark={isDark}
       />
 

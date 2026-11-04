@@ -1,10 +1,12 @@
 import React from 'react';
-import { PieChart, Settings } from 'lucide-react';
+import { Calendar, PieChart, Settings } from 'lucide-react';
 import { triggerHaptic } from '../utils/haptics';
+import { getLogicalDate } from '../utils/budget';
 
-export default function Header({ onOpenAnalytics, onOpenSettings, isDark }) {
-  const today = new Date();
-  const dateFormatted = today.toLocaleDateString('tr-TR', {
+export default function Header({ onOpenHistory, onOpenAnalytics, onOpenSettings, isDark }) {
+  // Use 06:00 AM logical date
+  const logicalToday = getLogicalDate(new Date(), 6);
+  const dateFormatted = logicalToday.toLocaleDateString('tr-TR', {
     weekday: 'long',
     day: 'numeric',
     month: 'long'
@@ -26,6 +28,25 @@ export default function Header({ onOpenAnalytics, onOpenSettings, isDark }) {
       </div>
 
       <div className="flex items-center gap-2">
+        {/* Calendar / Past Days History */}
+        <button
+          type="button"
+          onClick={() => {
+            triggerHaptic('light');
+            onOpenHistory();
+          }}
+          className={`p-2.5 rounded-full spring-tap ${
+            isDark
+              ? 'bg-neutral-900 text-neutral-300 hover:text-white border border-neutral-800'
+              : 'bg-white text-neutral-600 hover:text-neutral-900 shadow-sm border border-neutral-200/70'
+          }`}
+          title="Günlük Harcama Geçmişi"
+          aria-label="Günlük Harcama Geçmişi"
+        >
+          <Calendar className="w-5 h-5 stroke-[2.2]" />
+        </button>
+
+        {/* Analytics Breakdown */}
         <button
           type="button"
           onClick={() => {
@@ -43,6 +64,7 @@ export default function Header({ onOpenAnalytics, onOpenSettings, isDark }) {
           <PieChart className="w-5 h-5 stroke-[2.2]" />
         </button>
 
+        {/* Settings */}
         <button
           type="button"
           onClick={() => {

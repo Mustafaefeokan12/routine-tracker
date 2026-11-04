@@ -1,12 +1,12 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { getSalaryCycle, computeBudgetMetrics, getTodayString, formatCurrency } from '../src/utils/budget.js';
+import { getSalaryCycle, computeBudgetMetrics, getTodayString, computeDailyHistory, formatCurrency } from '../src/utils/budget.js';
 import { classifyExpense } from '../src/utils/categorizer.js';
 
 describe('Budget Financial Engine & Date Calculations', () => {
   test('Calculates current cycle for mid-cycle date (Nov 4, salaryDay 20)', () => {
-    // Current date: 4 Nov 2026, salary day: 20
-    const targetDate = new Date(2026, 10, 4); // Month 10 is November
+    // Current date: 4 Nov 2026 12:00, salary day: 20
+    const targetDate = new Date(2026, 10, 4, 12, 0); // Month 10 is November
     const cycle = getSalaryCycle(20, targetDate);
 
     // Cycle starts 20 Oct, ends 19 Nov
@@ -20,8 +20,8 @@ describe('Budget Financial Engine & Date Calculations', () => {
   });
 
   test('Calculates current cycle for salary day itself (Nov 20, salaryDay 20)', () => {
-    // Exactly on the 20th: new cycle begins!
-    const targetDate = new Date(2026, 10, 20);
+    // Exactly on the 20th 12:00: new cycle begins!
+    const targetDate = new Date(2026, 10, 20, 12, 0);
     const cycle = getSalaryCycle(20, targetDate);
 
     // Starts 20 Nov, ends 19 Dec
@@ -40,7 +40,7 @@ describe('Budget Financial Engine & Date Calculations', () => {
       expenses: [],
       monthlyIncome: 28000,
       salaryDay: 20,
-      targetDate: new Date(2026, 10, 4)
+      targetDate: new Date(2026, 10, 4, 12, 0)
     });
     assert.equal(Math.round(metrics31.dailyAllowance), 903);
     assert.equal(metrics31.todayNet, metrics31.dailyAllowance);
@@ -51,13 +51,13 @@ describe('Budget Financial Engine & Date Calculations', () => {
       expenses: [],
       monthlyIncome: 28000,
       salaryDay: 20,
-      targetDate: new Date(2026, 10, 22)
+      targetDate: new Date(2026, 10, 22, 12, 0)
     });
     assert.equal(Math.round(metrics30.dailyAllowance), 933);
   });
 
   test('Mid-cycle balance override (7.500 TL from Nov 4 to Nov 19 -> 16 days, 468.75 TL/day)', () => {
-    const targetDate = new Date(2026, 10, 4); // 4 Kasım
+    const targetDate = new Date(2026, 10, 4, 12, 0); // 4 Kasım
     const metrics = computeBudgetMetrics({
       expenses: [],
       monthlyIncome: 28000,
@@ -76,7 +76,7 @@ describe('Budget Financial Engine & Date Calculations', () => {
   });
 
   test('Mid-cycle balance override automatically resets when Nov 20 arrives', () => {
-    const targetDate = new Date(2026, 10, 20); // 20 Kasım (yeni döngü)
+    const targetDate = new Date(2026, 10, 20, 12, 0); // 20 Kasım 12:00 (yeni döngü)
     const metrics = computeBudgetMetrics({
       expenses: [],
       monthlyIncome: 28000,
@@ -127,6 +127,42 @@ describe('Budget Financial Engine & Date Calculations', () => {
     assert.equal(metricsOver.todayTotalSpent, 1500);
     assert.ok(metricsOver.todayNet < 0);
     assert.equal(metricsOver.isTodaySurplus, false);
+  });
+
+  test('06:00 AM reset boundary keeps late night expenses in previous day', () => {
+    // 00:40 AM on 5 Nov belongs to 4 Nov
+    const lateNight = new Date(2026, 10, 5, 0, 40);
+    assert.equal(getTodayString(lateNight, 6), '2026-11-04');
+
+    // 05:59 AM on 5 Nov still belongs to 4 Nov
+    const earlyMorning = new Date(2026, 10, 5, 5, 59);
+    assert.equal(getTodayString(earlyMorning, 6), '2026-11-04');
+
+    // 06:01 AM on 5 Nov rolls over to 5 Nov
+    const morningRollOver = new Date(2026, 10, 5, 6, 1);
+    assert.equal(getTodayString(morningRollOver, 6), '2026-11-05');
+  });
+
+  test('Computes daily spending history correctly', () => {
+    const expenses = [
+      { id: 1, title: 'IQOS', amount: 220, category: 'Tütün / IQOS', date: '2026-11-04', timestamp: Date.now() },
+      { id: 2, title: 'Kahve', amount: 90, category: 'Kahve & Kafe', date: '2026-11-04', timestamp: Date.now() }
+    ];
+
+    const history = computeDailyHistory({
+      expenses,
+      dailyAllowance: 468.75,
+      targetDate: new Date(2026, 10, 4, 12, 0),
+      resetHour: 6,
+      daysCount: 3
+    });
+
+    assert.equal(history.length, 3);
+    assert.equal(history[0].dateStr, '2026-11-04');
+    assert.equal(history[0].totalSpent, 310);
+    assert.equal(history[0].net, 468.75 - 310);
+    assert.equal(history[0].isSurplus, true);
+    assert.equal(history[0].items.length, 2);
   });
 
   test('Currency formatting handles integers and decimals cleanly', () => {

@@ -1,17 +1,42 @@
 /**
  * Financial & Date Calculation Engine for Budget App
  * Designed for Mustafa Efe Okan's Salary Cycle & Daily Allowance Model
+ * Day boundary reset: 06:00 AM (Night Owl boundary)
  */
+
+/**
+ * Returns adjusted Date object reflecting the 06:00 AM day boundary.
+ * If current time is between 00:00 and 05:59, it still belongs to yesterday.
+ */
+export function getLogicalDate(d = new Date(), resetHour = 6) {
+  const adjusted = new Date(d);
+  if (adjusted.getHours() < resetHour) {
+    adjusted.setDate(adjusted.getDate() - 1);
+  }
+  return adjusted;
+}
+
+/**
+ * Returns formatted YYYY-MM-DD string according to 06:00 AM reset boundary.
+ */
+export function getTodayString(d = new Date(), resetHour = 6) {
+  const adjusted = getLogicalDate(d, resetHour);
+  const year = adjusted.getFullYear();
+  const month = String(adjusted.getMonth() + 1).padStart(2, '0');
+  const day = String(adjusted.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 /**
  * Returns the current salary cycle based on salaryDay (default 20).
  * e.g., if salaryDay is 20 and today is Nov 4:
  * cycle is Oct 20 to Nov 19 (inclusive).
  */
-export function getSalaryCycle(salaryDay = 20, targetDate = new Date()) {
-  const currentDay = targetDate.getDate();
-  const currentMonth = targetDate.getMonth();
-  const currentYear = targetDate.getFullYear();
+export function getSalaryCycle(salaryDay = 20, targetDate = new Date(), resetHour = 6) {
+  const logicalNow = getLogicalDate(targetDate, resetHour);
+  const currentDay = logicalNow.getDate();
+  const currentMonth = logicalNow.getMonth();
+  const currentYear = logicalNow.getFullYear();
 
   let startYear = currentYear;
   let startMonth = currentMonth;
@@ -42,10 +67,10 @@ export function getSalaryCycle(salaryDay = 20, targetDate = new Date()) {
   const diffTime = endDate.getTime() - startDate.getTime();
   const totalDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
 
-  // Days elapsed from startDate to targetDate (1-based)
+  // Days elapsed from startDate to logicalNow (1-based)
   const elapsedDays = Math.min(
     totalDays,
-    Math.max(1, Math.ceil((targetDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)))
+    Math.max(1, Math.ceil((logicalNow.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)))
   );
 
   const remainingDays = Math.max(0, totalDays - elapsedDays);
@@ -71,13 +96,15 @@ export function computeBudgetMetrics({
   salaryDay = 20,
   currentBalance = 0,
   balanceSetDate = null,
+  resetHour = 6,
   targetDate = new Date()
 }) {
-  const cycle = getSalaryCycle(salaryDay, targetDate);
+  const logicalDate = getLogicalDate(targetDate, resetHour);
+  const cycle = getSalaryCycle(salaryDay, targetDate, resetHour);
   const cycleStartTs = cycle.startDate.getTime();
   const cycleEndTs = cycle.endDate.getTime();
 
-  const todayStr = getTodayString(targetDate);
+  const todayStr = getTodayString(targetDate, resetHour);
 
   let cycleTotalSpent = 0;
   let todayTotalSpent = 0;
@@ -109,20 +136,19 @@ export function computeBudgetMetrics({
       }
     }
 
-    // Check if spent today
+    // Check if spent today (based on logical date)
     if (exp.date === todayStr) {
       todayTotalSpent += amount;
     }
   }
 
   // Determine if mid-cycle balance override is active:
-  // Active only if balance > 0, set date is in CURRENT cycle (>= cycle.startDate), and targetDate is between set date & cycle.endDate
   const isBalanceActive = Boolean(
     currentBalance > 0 &&
     balanceSetDateObj &&
     balanceSetDateObj >= cycle.startDate &&
-    targetDate >= balanceSetDateObj &&
-    targetDate <= cycle.endDate
+    logicalDate >= balanceSetDateObj &&
+    logicalDate <= cycle.endDate
   );
 
   let dailyAllowance = 0;
@@ -131,19 +157,14 @@ export function computeBudgetMetrics({
   let daysLeftInPeriod = 0;
 
   if (isBalanceActive) {
-    // Calculate exact remaining days from today until salaryDay of next month
-    const todayMidnight = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 0, 0, 0, 0);
+    const todayMidnight = new Date(logicalDate.getFullYear(), logicalDate.getMonth(), logicalDate.getDate(), 0, 0, 0, 0);
     const nextSalaryMidnight = new Date(cycle.endDate.getFullYear(), cycle.endDate.getMonth(), cycle.endDate.getDate() + 1, 0, 0, 0, 0);
     daysLeftInPeriod = Math.max(1, Math.round((nextSalaryMidnight.getTime() - todayMidnight.getTime()) / (1000 * 60 * 60 * 24)));
 
-    // Daily allowance based on remaining 7.500 TL divided by remaining days
     dailyAllowance = currentBalance / daysLeftInPeriod;
-
-    // Remaining money in account
     cycleRemaining = Math.max(0, currentBalance - periodSpentSinceBalanceSet);
     cyclePercentSpent = currentBalance > 0 ? Math.min(100, Math.max(0, (periodSpentSinceBalanceSet / currentBalance) * 100)) : 0;
   } else {
-    // Standard monthly calculation (e.g. after Nov 20 resets to 28.000 TL)
     daysLeftInPeriod = cycle.remainingDays;
     dailyAllowance = cycle.totalDays > 0 ? (monthlyIncome / cycle.totalDays) : 0;
     cycleRemaining = Math.max(0, monthlyIncome - cycleTotalSpent);
@@ -180,11 +201,74 @@ export function computeBudgetMetrics({
   };
 }
 
-export function getTodayString(d = new Date()) {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+/**
+ * Computes daily spending history for the calendar modal.
+ * Groups expenses by logical date for past days in the cycle.
+ */
+export function computeDailyHistory({
+  expenses = [],
+  dailyAllowance = 0,
+  targetDate = new Date(),
+  resetHour = 6,
+  daysCount = 14
+}) {
+  const logicalNow = getLogicalDate(targetDate, resetHour);
+  const todayStr = getTodayString(targetDate, resetHour);
+
+  // Group all expenses by date string
+  const expensesByDate = {};
+  for (const exp of expenses) {
+    if (!exp.date) continue;
+    if (!expensesByDate[exp.date]) {
+      expensesByDate[exp.date] = [];
+    }
+    expensesByDate[exp.date].push(exp);
+  }
+
+  const history = [];
+
+  for (let i = 0; i < daysCount; i++) {
+    const d = new Date(logicalNow);
+    d.setDate(d.getDate() - i);
+
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+
+    const dayItems = expensesByDate[dateStr] || [];
+    const totalSpent = dayItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+    const net = dailyAllowance - totalSpent;
+    const isSurplus = net >= 0;
+
+    let relativeLabel = '';
+    if (i === 0) {
+      relativeLabel = 'Bugün';
+    } else if (i === 1) {
+      relativeLabel = 'Dün';
+    } else {
+      relativeLabel = d.toLocaleDateString('tr-TR', { weekday: 'short' });
+    }
+
+    const fullDateLabel = d.toLocaleDateString('tr-TR', {
+      day: 'numeric',
+      month: 'long'
+    });
+
+    history.push({
+      dateStr,
+      relativeLabel,
+      fullDateLabel,
+      totalSpent,
+      dailyAllowance,
+      net,
+      isSurplus,
+      items: dayItems,
+      hasExpenses: dayItems.length > 0
+    });
+  }
+
+  return history;
 }
 
 export function formatDateShort(d) {
