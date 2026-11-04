@@ -12,13 +12,15 @@ export const DEFAULT_SETTINGS = {
   monthlyIncome: 28000,
   salaryDay: 20,
   iqosPrice: 220,
+  currentBalance: 7500, // 4 Kasım itibarıyla hesapta kalan nakit
+  balanceSetDate: '2026-11-04',
   theme: 'dark', // 'dark' | 'light' | 'system'
   dailyNotification: false,
   notificationTime: '22:00'
 };
 
 export async function initDatabase() {
-  // Ensure default settings exist
+  // Ensure default settings exist or update missing keys
   for (const [key, value] of Object.entries(DEFAULT_SETTINGS)) {
     const existing = await db.settings.get(key);
     if (!existing) {

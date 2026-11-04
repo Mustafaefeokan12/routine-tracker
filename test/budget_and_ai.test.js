@@ -56,6 +56,41 @@ describe('Budget Financial Engine & Date Calculations', () => {
     assert.equal(Math.round(metrics30.dailyAllowance), 933);
   });
 
+  test('Mid-cycle balance override (7.500 TL from Nov 4 to Nov 19 -> 16 days, 468.75 TL/day)', () => {
+    const targetDate = new Date(2026, 10, 4); // 4 Kasım
+    const metrics = computeBudgetMetrics({
+      expenses: [],
+      monthlyIncome: 28000,
+      salaryDay: 20,
+      currentBalance: 7500,
+      balanceSetDate: '2026-11-04',
+      targetDate
+    });
+
+    assert.equal(metrics.isBalanceActive, true);
+    assert.equal(metrics.daysLeftInPeriod, 16);
+    assert.equal(metrics.dailyAllowance, 468.75);
+    assert.equal(metrics.cycleRemaining, 7500);
+    assert.equal(metrics.todayNet, 468.75);
+    assert.equal(metrics.isTodaySurplus, true);
+  });
+
+  test('Mid-cycle balance override automatically resets when Nov 20 arrives', () => {
+    const targetDate = new Date(2026, 10, 20); // 20 Kasım (yeni döngü)
+    const metrics = computeBudgetMetrics({
+      expenses: [],
+      monthlyIncome: 28000,
+      salaryDay: 20,
+      currentBalance: 7500,
+      balanceSetDate: '2026-11-04',
+      targetDate
+    });
+
+    assert.equal(metrics.isBalanceActive, false);
+    assert.equal(metrics.monthlyIncome, 28000);
+    assert.equal(Math.round(metrics.dailyAllowance), 933);
+  });
+
   test('Computes today net balance (+ when under allowance, - when overspent)', () => {
     const today = new Date();
     const todayStr = getTodayString(today);

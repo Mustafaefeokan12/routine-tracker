@@ -1,6 +1,6 @@
 import React from 'react';
 import { formatCurrency } from '../utils/budget';
-import { ArrowUpRight, ArrowDownRight, Sparkles } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Sparkles, Calendar } from 'lucide-react';
 
 export default function BudgetSummaryCard({ metrics, isDark }) {
   const {
@@ -12,7 +12,9 @@ export default function BudgetSummaryCard({ metrics, isDark }) {
     cycleTotalSpent,
     cycleRemaining,
     cyclePercentSpent,
-    cycle
+    cycle,
+    isBalanceActive,
+    daysLeftInPeriod
   } = metrics;
 
   return (
@@ -23,6 +25,18 @@ export default function BudgetSummaryCard({ metrics, isDark }) {
           : 'bg-white border border-neutral-200/80 text-neutral-900 shadow-sm'
       }`}
     >
+      {/* Top Banner when Mid-Cycle Active Balance is set */}
+      {isBalanceActive && (
+        <div className={`flex items-center gap-2 mb-3.5 px-3 py-1.5 rounded-xl text-xs font-semibold ${
+          isDark
+            ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
+            : 'bg-cyan-50 text-cyan-800 border border-cyan-200'
+        }`}>
+          <Sparkles className="w-3.5 h-3.5 shrink-0" />
+          <span>20 Kasım'a kadar 7.500 ₺ bütçe devrede ({daysLeftInPeriod} gün)</span>
+        </div>
+      )}
+
       {/* Today's Net Indicator Pill */}
       <div className="flex items-center justify-between gap-3 mb-4">
         <div>
@@ -64,11 +78,14 @@ export default function BudgetSummaryCard({ metrics, isDark }) {
         </div>
       </div>
 
-      {/* Monthly Budget Progress Bar */}
+      {/* Budget Progress Bar */}
       <div className="space-y-2 mt-5">
         <div className="flex items-center justify-between text-xs font-medium">
           <span className={isDark ? 'text-neutral-400' : 'text-neutral-500'}>
-            Aylık Kalan: <strong className={isDark ? 'text-neutral-200' : 'text-neutral-800'}>{formatCurrency(cycleRemaining, true)}</strong>
+            {isBalanceActive ? 'Kalan Nakit: ' : 'Aylık Kalan: '}
+            <strong className={isDark ? 'text-neutral-200' : 'text-neutral-800'}>
+              {formatCurrency(cycleRemaining, true)}
+            </strong>
           </span>
           <span className="num-tabular font-semibold">
             %{Math.round(cyclePercentSpent)} harcandı
@@ -101,7 +118,11 @@ export default function BudgetSummaryCard({ metrics, isDark }) {
             Günlük Hak: <strong className={isDark ? 'text-neutral-300' : 'text-neutral-700'}>{formatCurrency(dailyAllowance, true)}</strong>
           </span>
           <span>
-            {cycle.startLabel} – {cycle.endLabel} ({cycle.remainingDays} gün kaldı)
+            {isBalanceActive ? (
+              `20 Kasım'a ${daysLeftInPeriod} gün kaldı`
+            ) : (
+              `${cycle.startLabel} – ${cycle.endLabel} (${cycle.remainingDays} gün)`
+            )}
           </span>
         </div>
       </div>

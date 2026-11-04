@@ -63,11 +63,14 @@ export function getSalaryCycle(salaryDay = 20, targetDate = new Date()) {
 
 /**
  * Computes all financial metrics for the active cycle and today.
+ * Supports mid-cycle balance override (e.g. 7.500 TL remaining until Nov 20).
  */
 export function computeBudgetMetrics({
   expenses = [],
   monthlyIncome = 28000,
   salaryDay = 20,
+  currentBalance = 0,
+  balanceSetDate = null,
   targetDate = new Date()
 }) {
   const cycle = getSalaryCycle(salaryDay, targetDate);
@@ -78,7 +81,11 @@ export function computeBudgetMetrics({
 
   let cycleTotalSpent = 0;
   let todayTotalSpent = 0;
+  let periodSpentSinceBalanceSet = 0;
   const categoryTotals = {};
+
+  const balanceSetDateObj = balanceSetDate ? new Date(balanceSetDate + 'T00:00:00') : null;
+  const balanceSetTs = balanceSetDateObj ? balanceSetDateObj.getTime() : 0;
 
   for (const exp of expenses) {
     const expTs = exp.timestamp || new Date(exp.date).getTime();
@@ -95,6 +102,11 @@ export function computeBudgetMetrics({
       }
       categoryTotals[catName].total += amount;
       categoryTotals[catName].count += 1;
+
+      // Track spending specifically since balance was set
+      if (balanceSetTs > 0 && expTs >= balanceSetTs) {
+        periodSpentSinceBalanceSet += amount;
+      }
     }
 
     // Check if spent today
@@ -103,16 +115,44 @@ export function computeBudgetMetrics({
     }
   }
 
-  // Daily Allowance Formula: Monthly Income / Total Days in Cycle
-  const dailyAllowance = cycle.totalDays > 0 ? (monthlyIncome / cycle.totalDays) : 0;
+  // Determine if mid-cycle balance override is active:
+  // Active only if balance > 0, set date is in CURRENT cycle (>= cycle.startDate), and targetDate is between set date & cycle.endDate
+  const isBalanceActive = Boolean(
+    currentBalance > 0 &&
+    balanceSetDateObj &&
+    balanceSetDateObj >= cycle.startDate &&
+    targetDate >= balanceSetDateObj &&
+    targetDate <= cycle.endDate
+  );
+
+  let dailyAllowance = 0;
+  let cycleRemaining = 0;
+  let cyclePercentSpent = 0;
+  let daysLeftInPeriod = 0;
+
+  if (isBalanceActive) {
+    // Calculate exact remaining days from today until salaryDay of next month
+    const todayMidnight = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 0, 0, 0, 0);
+    const nextSalaryMidnight = new Date(cycle.endDate.getFullYear(), cycle.endDate.getMonth(), cycle.endDate.getDate() + 1, 0, 0, 0, 0);
+    daysLeftInPeriod = Math.max(1, Math.round((nextSalaryMidnight.getTime() - todayMidnight.getTime()) / (1000 * 60 * 60 * 24)));
+
+    // Daily allowance based on remaining 7.500 TL divided by remaining days
+    dailyAllowance = currentBalance / daysLeftInPeriod;
+
+    // Remaining money in account
+    cycleRemaining = Math.max(0, currentBalance - periodSpentSinceBalanceSet);
+    cyclePercentSpent = currentBalance > 0 ? Math.min(100, Math.max(0, (periodSpentSinceBalanceSet / currentBalance) * 100)) : 0;
+  } else {
+    // Standard monthly calculation (e.g. after Nov 20 resets to 28.000 TL)
+    daysLeftInPeriod = cycle.remainingDays;
+    dailyAllowance = cycle.totalDays > 0 ? (monthlyIncome / cycle.totalDays) : 0;
+    cycleRemaining = Math.max(0, monthlyIncome - cycleTotalSpent);
+    cyclePercentSpent = monthlyIncome > 0 ? Math.min(100, Math.max(0, (cycleTotalSpent / monthlyIncome) * 100)) : 0;
+  }
 
   // Today's Balance (+ is positive/karda, - is overspent/aşma)
   const todayNet = dailyAllowance - todayTotalSpent;
   const isTodaySurplus = todayNet >= 0;
-
-  // Monthly Remaining Balance
-  const cycleRemaining = monthlyIncome - cycleTotalSpent;
-  const cyclePercentSpent = monthlyIncome > 0 ? Math.min(100, Math.max(0, (cycleTotalSpent / monthlyIncome) * 100)) : 0;
 
   // Average spent per day elapsed in cycle
   const avgDailySpent = cycle.elapsedDays > 0 ? (cycleTotalSpent / cycle.elapsedDays) : 0;
@@ -122,12 +162,16 @@ export function computeBudgetMetrics({
 
   return {
     cycle,
-    monthlyIncome,
+    isBalanceActive,
+    daysLeftInPeriod,
+    monthlyIncome: isBalanceActive ? currentBalance : monthlyIncome,
+    baseIncome: monthlyIncome,
     dailyAllowance,
     todayTotalSpent,
     todayNet,
     isTodaySurplus,
-    cycleTotalSpent,
+    cycleTotalSpent: isBalanceActive ? periodSpentSinceBalanceSet : cycleTotalSpent,
+    allCycleSpent: cycleTotalSpent,
     cycleRemaining,
     cyclePercentSpent,
     avgDailySpent,

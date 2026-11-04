@@ -102,9 +102,11 @@ export default function App() {
       expenses,
       monthlyIncome: settings.monthlyIncome,
       salaryDay: settings.salaryDay,
+      currentBalance: settings.currentBalance,
+      balanceSetDate: settings.balanceSetDate,
       targetDate: new Date()
     });
-  }, [expenses, settings.monthlyIncome, settings.salaryDay]);
+  }, [expenses, settings.monthlyIncome, settings.salaryDay, settings.currentBalance, settings.balanceSetDate]);
 
   // 1. Add IQOS Quick Expense
   const handleAddIqos = async () => {

@@ -14,6 +14,7 @@ export default function SettingsModal({
   const [income, setIncome] = useState(settings.monthlyIncome?.toString() || '28000');
   const [salaryDay, setSalaryDay] = useState(settings.salaryDay?.toString() || '20');
   const [iqosPrice, setIqosPrice] = useState(settings.iqosPrice?.toString() || '220');
+  const [currentBalance, setCurrentBalance] = useState(settings.currentBalance?.toString() || '7500');
   const [theme, setTheme] = useState(settings.theme || 'dark');
   const [notificationEnabled, setNotificationEnabled] = useState(!!settings.dailyNotification);
   const [showConfirmReset, setShowConfirmReset] = useState(false);
@@ -26,6 +27,8 @@ export default function SettingsModal({
     onUpdateSetting('monthlyIncome', Number(income) || 28000);
     onUpdateSetting('salaryDay', Math.min(31, Math.max(1, Number(salaryDay) || 20)));
     onUpdateSetting('iqosPrice', Number(iqosPrice) || 220);
+    onUpdateSetting('currentBalance', Number(currentBalance) || 7500);
+    onUpdateSetting('balanceSetDate', settings.balanceSetDate || '2026-11-04');
     onClose();
   };
 
@@ -132,7 +135,29 @@ export default function SettingsModal({
                 <label className={`text-xs font-semibold block mb-1 ${
                   isDark ? 'text-neutral-300' : 'text-neutral-700'
                 }`}>
-                  Aylık Gelir / Bütçe (₺)
+                  Mevcut Kalan Nakit (20 Kasım'a Kadar) (₺)
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={currentBalance}
+                  onChange={(e) => setCurrentBalance(e.target.value.replace(/\D/g, ''))}
+                  className={`w-full px-3.5 py-2.5 rounded-xl text-sm font-bold num-tabular outline-none ${
+                    isDark
+                      ? 'bg-neutral-900 border border-neutral-700 text-white focus:border-cyan-500'
+                      : 'bg-white border border-neutral-300 text-neutral-900 focus:border-cyan-600'
+                  }`}
+                />
+                <span className={`text-[10px] block mt-1 ${isDark ? 'text-neutral-500' : 'text-neutral-400'}`}>
+                  20 Kasım'a kadar günlük harcaman bu bakiye üzerinden hesaplanır (469 ₺/gün). 20 Kasım'da 28.000 ₺'ye sıfırlanır.
+                </span>
+              </div>
+
+              <div>
+                <label className={`text-xs font-semibold block mb-1 ${
+                  isDark ? 'text-neutral-300' : 'text-neutral-700'
+                }`}>
+                  Aylık Standart Gelir (20'sinde Yenilenen) (₺)
                 </label>
                 <input
                   type="text"
