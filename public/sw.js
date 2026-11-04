@@ -1,4 +1,4 @@
-const CACHE_NAME = 'routinetrack-v2.4';
+const CACHE_NAME = 'budget-v1.0';
 const STATIC_ASSETS = [
   './',
   './index.html',

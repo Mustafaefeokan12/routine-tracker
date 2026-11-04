@@ -1,0 +1,110 @@
+import React from 'react';
+import { formatCurrency } from '../utils/budget';
+import { ArrowUpRight, ArrowDownRight, Sparkles } from 'lucide-react';
+
+export default function BudgetSummaryCard({ metrics, isDark }) {
+  const {
+    monthlyIncome,
+    dailyAllowance,
+    todayTotalSpent,
+    todayNet,
+    isTodaySurplus,
+    cycleTotalSpent,
+    cycleRemaining,
+    cyclePercentSpent,
+    cycle
+  } = metrics;
+
+  return (
+    <section
+      className={`rounded-3xl p-5 transition-all shadow-sm ${
+        isDark
+          ? 'bg-neutral-900/90 border border-neutral-800/80 text-white'
+          : 'bg-white border border-neutral-200/80 text-neutral-900 shadow-sm'
+      }`}
+    >
+      {/* Today's Net Indicator Pill */}
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <div>
+          <span className={`text-[11px] font-bold uppercase tracking-wider ${
+            isDark ? 'text-neutral-400' : 'text-neutral-500'
+          }`}>
+            Bugünün Durumu
+          </span>
+          <div className="flex items-baseline gap-2 mt-0.5">
+            <span className="text-3xl font-extrabold tracking-tight num-tabular">
+              {isTodaySurplus ? '+' : ''}
+              {formatCurrency(todayNet, true)}
+            </span>
+          </div>
+        </div>
+
+        <div
+          className={`px-3 py-1.5 rounded-full flex items-center gap-1.5 text-xs font-semibold ${
+            isTodaySurplus
+              ? isDark
+                ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+              : isDark
+                ? 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                : 'bg-rose-50 text-rose-700 border border-rose-200'
+          }`}
+        >
+          {isTodaySurplus ? (
+            <>
+              <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
+              <span>Kardasın</span>
+            </>
+          ) : (
+            <>
+              <ArrowDownRight className="w-4 h-4 stroke-[2.5]" />
+              <span>Aştın</span>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Monthly Budget Progress Bar */}
+      <div className="space-y-2 mt-5">
+        <div className="flex items-center justify-between text-xs font-medium">
+          <span className={isDark ? 'text-neutral-400' : 'text-neutral-500'}>
+            Aylık Kalan: <strong className={isDark ? 'text-neutral-200' : 'text-neutral-800'}>{formatCurrency(cycleRemaining, true)}</strong>
+          </span>
+          <span className="num-tabular font-semibold">
+            %{Math.round(cyclePercentSpent)} harcandı
+          </span>
+        </div>
+
+        {/* Apple Sleek Progress Track */}
+        <div className={`h-2.5 w-full rounded-full overflow-hidden ${
+          isDark ? 'bg-neutral-800' : 'bg-neutral-100'
+        }`}>
+          <div
+            className={`h-full rounded-full transition-all duration-500 ease-out ${
+              cyclePercentSpent > 90
+                ? 'bg-rose-500'
+                : cyclePercentSpent > 70
+                  ? 'bg-amber-500'
+                  : isDark
+                    ? 'bg-emerald-400'
+                    : 'bg-emerald-500'
+            }`}
+            style={{ width: `${Math.min(100, Math.max(0, cyclePercentSpent))}%` }}
+          />
+        </div>
+
+        {/* Sub-Info Row */}
+        <div className={`flex items-center justify-between text-[11px] pt-1 ${
+          isDark ? 'text-neutral-400' : 'text-neutral-500'
+        }`}>
+          <span>
+            Günlük Hak: <strong className={isDark ? 'text-neutral-300' : 'text-neutral-700'}>{formatCurrency(dailyAllowance, true)}</strong>
+          </span>
+          <span>
+            {cycle.startLabel} – {cycle.endLabel} ({cycle.remainingDays} gün kaldı)
+          </span>
+        </div>
+      </div>
+    </section>
+  );
+}

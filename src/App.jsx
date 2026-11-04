@@ -1,937 +1,308 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import confetti from 'canvas-confetti';
-import { db, initDatabase, DEFAULT_ROUTINES } from './db';
-import { getTodayString, calculateStreaks, getPastDaysList } from './utils/date';
-import { playClickSound } from './utils/sound';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  db,
+  initDatabase,
+  getSetting,
+  setSetting,
+  DEFAULT_SETTINGS
+} from './db';
+import {
+  computeBudgetMetrics,
+  getTodayString
+} from './utils/budget';
+import { triggerHaptic, soundEngine } from './utils/haptics';
+
 import Header from './components/Header';
-import RoutineList from './components/RoutineList';
-import TrackerHeatmap from './components/TrackerHeatmap';
-import TereaWidget from './components/TereaWidget';
-import QuickAddModal from './components/QuickAddModal';
-import DayDetailModal from './components/DayDetailModal';
+import BudgetSummaryCard from './components/BudgetSummaryCard';
+import QuickActionCards from './components/QuickActionCards';
+import ExpenseList from './components/ExpenseList';
+import YemekKartiSheet from './components/YemekKartiSheet';
+import AddExpenseSheet from './components/AddExpenseSheet';
+import UndoToast from './components/UndoToast';
+import AnalyticsModal from './components/AnalyticsModal';
 import SettingsModal from './components/SettingsModal';
-import BadgesModal from './components/BadgesModal';
-import PinLockScreen from './components/PinLockScreen';
-import { CheckSquare, BarChart2, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 
 export default function App() {
-  const [routines, setRoutines] = useState([]);
-  const [completedMap, setCompletedMap] = useState({});
-  const [quantityMap, setQuantityMap] = useState({});
-  const [currentScore, setCurrentScore] = useState(0);
-  const [targetScore, setTargetScore] = useState(100);
-  const [resetHour, setResetHour] = useState(4); // 04:00 Night Owl default
-  const [todayStr, setTodayStr] = useState(getTodayString(4));
-  const [daysMap, setDaysMap] = useState({});
-  const [categoryScoresMap, setCategoryScoresMap] = useState({});
-  const [streak, setStreak] = useState(0);
-  const [freezeUsed, setFreezeUsed] = useState(false);
+  const [expenses, setExpenses] = useState([]);
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [suggestions, setSuggestions] = useState([]);
+  const [isLoaded, setIsLoaded] = useState(false);
 
-  // Security PIN State
-  const [pinEnabled, setPinEnabled] = useState(false);
-  const [storedPinHash, setStoredPinHash] = useState('');
-  const [isAppLocked, setIsAppLocked] = useState(false);
-  const isPinCheckedRef = useRef(false);
+  // Modals
+  const [isYemekKartiOpen, setIsYemekKartiOpen] = useState(false);
+  const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
+  const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-  // Terea State
-  const [tereaPrice, setTereaPrice] = useState(6.0); // 6.00 TL per stick (120 TL pack)
-  const [todayTereaSticks, setTodayTereaSticks] = useState(0);
-  const [soundEnabled, setSoundEnabled] = useState(true);
+  // Undo Toast state
+  const [lastExpense, setLastExpense] = useState(null);
 
-  // Privacy Shield (Blur Mode)
-  const [privacyMode, setPrivacyMode] = useState(false);
-
-  // UI Navigation & Modals
-  const [currentView, setCurrentView] = useState('routines'); // 'routines' | 'tracker'
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [editingRoutine, setEditingRoutine] = useState(null);
-  const [showFlameToast, setShowFlameToast] = useState(false);
-  const [showTereaDetails, setShowTereaDetails] = useState(false);
-  const toastTimeoutRef = useRef(null);
-  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const [isBadgesModalOpen, setIsBadgesModalOpen] = useState(false);
-  const [selectedDay, setSelectedDay] = useState(null);
-
-  // Load all data from IndexedDB in high-speed parallel batches
+  // Load Database & Settings
   const loadData = useCallback(async () => {
-    await initDatabase();
+    try {
+      await initDatabase();
 
-    // Fetch settings in single fast query
-    const settingsArr = await db.settings.toArray();
-    const settingsMap = {};
-    settingsArr.forEach((s) => {
-      settingsMap[s.key] = s.value;
-    });
+      const [loadedExpenses, loadedSettings, loadedSuggestions] = await Promise.all([
+        db.expenses.orderBy('timestamp').reverse().toArray(),
+        db.settings.toArray(),
+        db.suggestions.orderBy('useCount').reverse().limit(5).toArray()
+      ]);
 
-    const targetVal = settingsMap.dailyTarget ?? 100;
-    setTargetScore(targetVal);
-
-    const resetVal = settingsMap.resetHour ?? 4;
-    setResetHour(resetVal);
-
-    const priceVal = settingsMap.tereaStickPrice ?? 6.0;
-    setTereaPrice(priceVal);
-
-    const soundVal = settingsMap.soundEnabled ?? true;
-    setSoundEnabled(soundVal);
-
-    // Load Security PIN settings
-    const hasPin = !!(settingsMap.pinEnabled && settingsMap.pinHash);
-    setPinEnabled(hasPin);
-    setStoredPinHash(settingsMap.pinHash || '');
-    if (hasPin) {
-      setIsAppLocked((prev) => (isPinCheckedRef.current ? prev : true));
-    } else {
-      setIsAppLocked(false);
-    }
-    isPinCheckedRef.current = true;
-
-    const currentToday = getTodayString(resetVal);
-    setTodayStr(currentToday);
-
-    // High-speed parallel fetch for routines, logs, and day records
-    const [activeRoutines, todayLogs, todayDayRecord, allDays, allLogs] = await Promise.all([
-      db.routines.filter((r) => !r.archived).sortBy('order'),
-      db.logs.where('date').equals(currentToday).toArray(),
-      db.days.get(currentToday),
-      db.days.toArray(),
-      db.logs.toArray()
-    ]);
-
-    setRoutines(activeRoutines);
-
-    // Today's Completed Routine Logs
-    const map = {};
-    const qMap = {};
-    let score = 0;
-    todayLogs.forEach((log) => {
-      map[log.routineId] = true;
-      score += log.weight || 0;
-      if (log.currentQuantity !== undefined) {
-        qMap[log.routineId] = log.currentQuantity;
+      const settingsMap = { ...DEFAULT_SETTINGS };
+      for (const item of loadedSettings) {
+        settingsMap[item.key] = item.value;
       }
-    });
-    setCompletedMap(map);
-    setQuantityMap((prev) => ({ ...prev, ...qMap }));
-    setCurrentScore(score);
 
-    // Today's Terea Sticks
-    const sticks = todayDayRecord?.tereaCount || 0;
-    setTodayTereaSticks(sticks);
-
-    // Load All Days for Heatmap & Streak
-    const dMap = {};
-    allDays.forEach((d) => {
-      dMap[d.date] = d;
-    });
-    // Ensure today is reflected in map
-    dMap[currentToday] = {
-      date: currentToday,
-      totalScore: score,
-      targetScore: targetVal,
-      completedCount: todayLogs.length,
-      tereaCount: sticks,
-      note: dMap[currentToday]?.note || ''
-    };
-    setDaysMap(dMap);
-
-    // Compute Category Breakdown Map for Heatmap
-    const routinesMap = {};
-    activeRoutines.forEach((r) => {
-      routinesMap[r.id] = r;
-    });
-
-    const catMap = {};
-    allLogs.forEach((log) => {
-      const d = log.date;
-      if (!catMap[d]) catMap[d] = {};
-      const r = routinesMap[log.routineId];
-      const cat = r?.category || 'study';
-      catMap[d][cat] = (catMap[d][cat] || 0) + (log.weight || 0);
-    });
-    setCategoryScoresMap(catMap);
-
-    // Calculate Streaks with Flexible Discipline
-    const streakInfo = calculateStreaks(dMap, 80, resetVal);
-    setStreak(streakInfo.currentStreak);
-    setFreezeUsed(streakInfo.freezeUsed);
+      setExpenses(loadedExpenses);
+      setSettings(settingsMap);
+      setSuggestions(loadedSuggestions);
+      setIsLoaded(true);
+    } catch (err) {
+      console.error('Veri yükleme hatası:', err);
+    }
   }, []);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  // Compute Advanced Terea Expense Statistics (Week, Month-to-date, All-time)
-  const tereaStats = useMemo(() => {
-    const past7Days = getPastDaysList(7, resetHour);
-    const [year, month] = todayStr.split('-');
-    const currentMonthPrefix = `${year}-${month}`;
+  // Apply Theme dynamically
+  const isDark = useMemo(() => {
+    if (settings.theme === 'light') return false;
+    if (settings.theme === 'dark') return true;
+    // System preference fallback
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    return true;
+  }, [settings.theme]);
 
-    let weekSticks = 0;
-    let monthSticks = 0;
-    let allTimeSticks = 0;
-    let trackedDaysWithTerea = 0;
-
-    Object.keys(daysMap).forEach((date) => {
-      const count = daysMap[date]?.tereaCount || 0;
-      allTimeSticks += count;
-      if (count > 0) trackedDaysWithTerea++;
-
-      if (past7Days.includes(date)) {
-        weekSticks += count;
-      }
-      if (date.startsWith(currentMonthPrefix)) {
-        monthSticks += count;
-      }
-    });
-
-    const weekSpent = weekSticks * tereaPrice;
-    const weekPacks = (weekSticks / 20).toFixed(1);
-
-    const monthSpent = monthSticks * tereaPrice;
-    const monthPacks = (monthSticks / 20).toFixed(1);
-
-    const allTimeSpent = allTimeSticks * tereaPrice;
-    const allTimePacks = (allTimeSticks / 20).toFixed(1);
-
-    const dailyAvgSticks = trackedDaysWithTerea > 0
-      ? (allTimeSticks / Math.max(trackedDaysWithTerea, 1)).toFixed(1)
-      : todayTereaSticks.toFixed(1);
-
-    return {
-      weekSticks,
-      weekSpent,
-      weekPacks,
-      monthSticks,
-      monthSpent,
-      monthPacks,
-      allTimeSticks,
-      allTimeSpent,
-      allTimePacks,
-      dailyAvgSticks
-    };
-  }, [daysMap, todayStr, resetHour, tereaPrice, todayTereaSticks]);
-
-  // Toggle routine completion
-  const handleToggleRoutine = async (routine) => {
-    if (soundEnabled) playClickSound();
-    const isCompleted = !!completedMap[routine.id];
-    const logId = `${todayStr}_${routine.id}`;
-
-    let newScore = currentScore;
-    const newMap = { ...completedMap };
-    const isQty = routine.type === 'quantity' || (routine.targetQuantity && routine.unit);
-    const targetQ = Number(routine.targetQuantity) || 1;
-
-    if (!isCompleted) {
-      // Mark Completed
-      const qtyToSet = isQty ? targetQ : undefined;
-      await db.logs.put({
-        id: logId,
-        date: todayStr,
-        routineId: routine.id,
-        title: routine.title,
-        weight: routine.weight,
-        currentQuantity: qtyToSet,
-        completedAt: new Date().toISOString()
-      });
-      newMap[routine.id] = true;
-      newScore += routine.weight;
-
-      if (isQty) {
-        setQuantityMap((prev) => ({ ...prev, [routine.id]: targetQ }));
-      }
-
-      // Celebrate 100 Score with Apple-like micro confetti
-      if (newScore >= targetScore && currentScore < targetScore) {
-        confetti({
-          particleCount: 50,
-          spread: 60,
-          origin: { y: 0.8 },
-          colors: ['#10b981', '#34d399', '#6ee7b7', '#ffffff']
-        });
-      }
+  useEffect(() => {
+    const root = document.documentElement;
+    if (isDark) {
+      root.classList.add('dark');
+      root.classList.remove('light');
     } else {
-      // Mark Uncompleted
-      await db.logs.delete(logId);
-      const numId = Number(routine.id);
-      if (!isNaN(numId)) {
-        await db.logs.delete(`${todayStr}_${numId}`);
-      }
-      delete newMap[routine.id];
-      if (!isNaN(numId)) {
-        delete newMap[numId];
-      }
-      newScore = Math.max(0, newScore - routine.weight);
+      root.classList.add('light');
+      root.classList.remove('dark');
+    }
 
-      if (isQty) {
-        setQuantityMap((prev) => {
-          const next = { ...prev };
-          delete next[routine.id];
-          if (!isNaN(numId)) delete next[numId];
-          return next;
+    const metaThemeColor = document.querySelector("meta[name='theme-color']");
+    if (metaThemeColor) {
+      metaThemeColor.setAttribute('content', isDark ? '#000000' : '#f2f2f7');
+    }
+  }, [isDark]);
+
+  // Financial Metrics Computation
+  const todayStr = useMemo(() => getTodayString(), []);
+
+  const metrics = useMemo(() => {
+    return computeBudgetMetrics({
+      expenses,
+      monthlyIncome: settings.monthlyIncome,
+      salaryDay: settings.salaryDay,
+      targetDate: new Date()
+    });
+  }, [expenses, settings.monthlyIncome, settings.salaryDay]);
+
+  // 1. Add IQOS Quick Expense
+  const handleAddIqos = async () => {
+    const newExp = {
+      title: 'IQOS (1 Paket)',
+      amount: settings.iqosPrice || 220,
+      category: 'Tütün / IQOS',
+      categoryIcon: '🚬',
+      isQuick: true,
+      timestamp: Date.now(),
+      date: todayStr
+    };
+
+    const id = await db.expenses.add(newExp);
+    const saved = { ...newExp, id };
+    setExpenses((prev) => [saved, ...prev]);
+    setLastExpense(saved);
+  };
+
+  // 2. Add Yemek Karti Expense
+  const handleSaveYemekKarti = async (expData) => {
+    const newExp = {
+      ...expData,
+      timestamp: Date.now(),
+      date: todayStr
+    };
+
+    const id = await db.expenses.add(newExp);
+    const saved = { ...newExp, id };
+    setExpenses((prev) => [saved, ...prev]);
+    setLastExpense(saved);
+  };
+
+  // 3. Add Custom / Serbest Expense
+  const handleSaveCustomExpense = async (expData) => {
+    const newExp = {
+      ...expData,
+      timestamp: Date.now(),
+      date: todayStr
+    };
+
+    const id = await db.expenses.add(newExp);
+    const saved = { ...newExp, id };
+    setExpenses((prev) => [saved, ...prev]);
+    setLastExpense(saved);
+
+    // Update suggestions if custom title was provided
+    if (expData.title && expData.title !== 'Hızlı Harcama') {
+      const existing = await db.suggestions.where('title').equalsIgnoreCase(expData.title).first();
+      if (existing) {
+        await db.suggestions.update(existing.id, {
+          useCount: (existing.useCount || 1) + 1,
+          lastUsed: Date.now()
+        });
+      } else {
+        await db.suggestions.add({
+          title: expData.title,
+          useCount: 1,
+          lastUsed: Date.now()
         });
       }
-    }
-
-    setCompletedMap(newMap);
-    setCurrentScore(newScore);
-
-    const completedCount = Object.keys(newMap).length;
-    await db.days.put({
-      date: todayStr,
-      totalScore: newScore,
-      targetScore,
-      completedCount,
-      tereaCount: todayTereaSticks,
-      note: daysMap[todayStr]?.note || ''
-    });
-
-    const updatedMap = {
-      ...daysMap,
-      [todayStr]: {
-        date: todayStr,
-        totalScore: newScore,
-        targetScore,
-        completedCount,
-        tereaCount: todayTereaSticks,
-        note: daysMap[todayStr]?.note || ''
-      }
-    };
-    setDaysMap(updatedMap);
-
-    const streakInfo = calculateStreaks(updatedMap, 80, resetHour);
-    setStreak(streakInfo.currentStreak);
-    setFreezeUsed(streakInfo.freezeUsed);
-
-    // Update category map in memory
-    const cat = routine.category || 'study';
-    setCategoryScoresMap((prev) => {
-      const dayCats = { ...(prev[todayStr] || {}) };
-      const currentCatScore = dayCats[cat] || 0;
-      dayCats[cat] = !isCompleted
-        ? currentCatScore + routine.weight
-        : Math.max(0, currentCatScore - routine.weight);
-      return { ...prev, [todayStr]: dayCats };
-    });
-  };
-
-  // Update quantity habit progress
-  const handleUpdateQuantity = async (routine, newQty) => {
-    setQuantityMap((prev) => ({ ...prev, [routine.id]: newQty }));
-    const logId = `${todayStr}_${routine.id}`;
-    const targetQ = Number(routine.targetQuantity) || 1;
-    const isCompleted = !!completedMap[routine.id];
-
-    if (newQty >= targetQ && !isCompleted) {
-      // Auto-complete routine
-      if (soundEnabled) playClickSound();
-      await db.logs.put({
-        id: logId,
-        date: todayStr,
-        routineId: routine.id,
-        title: routine.title,
-        weight: routine.weight,
-        currentQuantity: newQty,
-        completedAt: new Date().toISOString()
-      });
-
-      const newScore = currentScore + routine.weight;
-      const newMap = { ...completedMap, [routine.id]: true };
-      setCompletedMap(newMap);
-      setCurrentScore(newScore);
-
-      if (newScore >= targetScore && currentScore < targetScore) {
-        confetti({
-          particleCount: 50,
-          spread: 60,
-          origin: { y: 0.8 },
-          colors: ['#10b981', '#34d399', '#6ee7b7', '#ffffff']
-        });
-      }
-
-      await db.days.put({
-        date: todayStr,
-        totalScore: newScore,
-        targetScore,
-        completedCount: Object.keys(newMap).length,
-        tereaCount: todayTereaSticks,
-        note: daysMap[todayStr]?.note || ''
-      });
-
-      const updatedMap = {
-        ...daysMap,
-        [todayStr]: {
-          date: todayStr,
-          totalScore: newScore,
-          targetScore,
-          completedCount: Object.keys(newMap).length,
-          tereaCount: todayTereaSticks,
-          note: daysMap[todayStr]?.note || ''
-        }
-      };
-      setDaysMap(updatedMap);
-      const streakInfo = calculateStreaks(updatedMap, 80, resetHour);
-      setStreak(streakInfo.currentStreak);
-      setFreezeUsed(streakInfo.freezeUsed);
-
-      const cat = routine.category || 'study';
-      setCategoryScoresMap((prev) => {
-        const dayCats = { ...(prev[todayStr] || {}) };
-        dayCats[cat] = (dayCats[cat] || 0) + routine.weight;
-        return { ...prev, [todayStr]: dayCats };
-      });
-    } else if (newQty < targetQ && isCompleted) {
-      // Un-complete routine
-      await db.logs.delete(logId);
-      const newScore = Math.max(0, currentScore - routine.weight);
-      const newMap = { ...completedMap };
-      delete newMap[routine.id];
-      setCompletedMap(newMap);
-      setCurrentScore(newScore);
-
-      await db.days.put({
-        date: todayStr,
-        totalScore: newScore,
-        targetScore,
-        completedCount: Object.keys(newMap).length,
-        tereaCount: todayTereaSticks,
-        note: daysMap[todayStr]?.note || ''
-      });
-
-      const updatedMap = {
-        ...daysMap,
-        [todayStr]: {
-          date: todayStr,
-          totalScore: newScore,
-          targetScore,
-          completedCount: Object.keys(newMap).length,
-          tereaCount: todayTereaSticks,
-          note: daysMap[todayStr]?.note || ''
-        }
-      };
-      setDaysMap(updatedMap);
-      const streakInfo = calculateStreaks(updatedMap, 80, resetHour);
-      setStreak(streakInfo.currentStreak);
-      setFreezeUsed(streakInfo.freezeUsed);
-
-      const cat = routine.category || 'study';
-      setCategoryScoresMap((prev) => {
-        const dayCats = { ...(prev[todayStr] || {}) };
-        dayCats[cat] = Math.max(0, (dayCats[cat] || 0) - routine.weight);
-        return { ...prev, [todayStr]: dayCats };
-      });
-    } else if (isCompleted) {
-      // Update quantity on existing log
-      await db.logs.update(logId, { currentQuantity: newQty });
+      const updatedSuggestions = await db.suggestions.orderBy('useCount').reverse().limit(5).toArray();
+      setSuggestions(updatedSuggestions);
     }
   };
 
-  // Toggle MIT star
-  const handleToggleMit = async (routine) => {
-    const nextMit = !routine.isMit;
-    const numId = Number(routine.id);
-    let updated = await db.routines.update(routine.id, { isMit: nextMit });
-    if (updated === 0 && !isNaN(numId)) {
-      await db.routines.update(numId, { isMit: nextMit });
+  // 4. Delete Expense
+  const handleDeleteExpense = async (id) => {
+    await db.expenses.delete(id);
+    setExpenses((prev) => prev.filter((e) => e.id !== id));
+    if (lastExpense && lastExpense.id === id) {
+      setLastExpense(null);
     }
-    setRoutines((prev) =>
-      prev.map((r) => (r.id === routine.id || r.id === numId ? { ...r, isMit: nextMit } : r))
+  };
+
+  // 5. Undo Last Expense
+  const handleUndo = async (id) => {
+    await db.expenses.delete(id);
+    setExpenses((prev) => prev.filter((e) => e.id !== id));
+    setLastExpense(null);
+  };
+
+  // 6. Update Settings
+  const handleUpdateSetting = async (key, value) => {
+    await setSetting(key, value);
+    setSettings((prev) => ({ ...prev, [key]: value }));
+  };
+
+  if (!isLoaded) {
+    return (
+      <div className={`min-h-screen flex items-center justify-center ${
+        isDark ? 'bg-black text-white' : 'bg-[#f2f2f7] text-neutral-900'
+      }`}>
+        <div className="w-6 h-6 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" />
+      </div>
     );
-  };
-
-  // Toggle routine freeze
-  const handleToggleFreeze = async (routine) => {
-    const nextFreeze = !routine.isFrozen;
-    const numId = Number(routine.id);
-    let updated = await db.routines.update(routine.id, { isFrozen: nextFreeze });
-    if (updated === 0 && !isNaN(numId)) {
-      await db.routines.update(numId, { isFrozen: nextFreeze });
-    }
-    setRoutines((prev) =>
-      prev.map((r) => (r.id === routine.id || r.id === numId ? { ...r, isFrozen: nextFreeze } : r))
-    );
-  };
-
-  // Toggle subtask in checklist
-  const handleToggleSubtask = async (routine, subtaskId) => {
-    const updatedSubtasks = (routine.subtasks || []).map((st) =>
-      st.id === subtaskId ? { ...st, done: !st.done } : st
-    );
-    await db.routines.update(routine.id, { subtasks: updatedSubtasks });
-    setRoutines((prev) =>
-      prev.map((r) => (r.id === routine.id ? { ...r, subtasks: updatedSubtasks } : r))
-    );
-
-    const allDone = updatedSubtasks.length > 0 && updatedSubtasks.every((st) => st.done);
-    const isCompleted = !!completedMap[routine.id];
-    if (allDone && !isCompleted) {
-      handleToggleRoutine(routine);
-    } else if (isCompleted && !allDone) {
-      handleToggleRoutine(routine);
-    }
-  };
-
-  // Terea Increment (+)
-  const handleIncrementTerea = async () => {
-    const newCount = todayTereaSticks + 1;
-    setTodayTereaSticks(newCount);
-
-    await db.tereaLogs.add({
-      date: todayStr,
-      timestamp: new Date().toISOString(),
-      pricePerStick: tereaPrice
-    });
-
-    await db.days.put({
-      date: todayStr,
-      totalScore: currentScore,
-      targetScore,
-      completedCount: Object.keys(completedMap).length,
-      tereaCount: newCount,
-      note: daysMap[todayStr]?.note || ''
-    });
-
-    setDaysMap((prev) => ({
-      ...prev,
-      [todayStr]: {
-        ...(prev[todayStr] || {}),
-        date: todayStr,
-        tereaCount: newCount
-      }
-    }));
-  };
-
-  // Terea Decrement (-)
-  const handleDecrementTerea = async () => {
-    if (todayTereaSticks <= 0) return;
-    const newCount = todayTereaSticks - 1;
-    setTodayTereaSticks(newCount);
-
-    await db.days.put({
-      date: todayStr,
-      totalScore: currentScore,
-      targetScore,
-      completedCount: Object.keys(completedMap).length,
-      tereaCount: newCount,
-      note: daysMap[todayStr]?.note || ''
-    });
-
-    setDaysMap((prev) => ({
-      ...prev,
-      [todayStr]: {
-        ...(prev[todayStr] || {}),
-        date: todayStr,
-        tereaCount: newCount
-      }
-    }));
-  };
-
-  // Add new routine or one-time to-do
-  const handleAddRoutine = async (newRoutine) => {
-    await db.routines.add(newRoutine);
-    await loadData();
-  };
-
-  // Delete routine permanently
-  const handleDeleteRoutine = async (id) => {
-    const numId = Number(id);
-    await db.routines.delete(id);
-    if (!isNaN(numId)) {
-      await db.routines.delete(numId);
-    }
-    await db.logs.where('routineId').equals(id).delete();
-    if (!isNaN(numId)) {
-      await db.logs.where('routineId').equals(numId).delete();
-    }
-    setCompletedMap((prev) => {
-      const next = { ...prev };
-      delete next[id];
-      delete next[numId];
-      return next;
-    });
-    setQuantityMap((prev) => {
-      const next = { ...prev };
-      delete next[id];
-      delete next[numId];
-      return next;
-    });
-    await loadData();
-  };
-
-  // Update/Edit existing routine
-  const handleUpdateRoutine = async (updatedRoutine) => {
-    await db.routines.put(updatedRoutine);
-    await loadData();
-  };
-
-  // Open edit modal for a specific routine
-  const handleOpenEditRoutine = (routine) => {
-    setEditingRoutine(routine);
-    setIsAddModalOpen(true);
-  };
-
-  // Close add/edit modal and clear selection
-  const handleCloseAddModal = () => {
-    setIsAddModalOpen(false);
-    setEditingRoutine(null);
-  };
-
-  // Floating Flame Fast Terea Click (+1 Dal) with tactile feedback & animation
-  const handleFastTereaClick = () => {
-    if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
-      try {
-        window.navigator.vibrate([30, 20, 30]);
-      } catch (e) {}
-    }
-    if (soundEnabled) playClickSound();
-    handleIncrementTerea();
-    setShowFlameToast(true);
-    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
-    toastTimeoutRef.current = setTimeout(() => {
-      setShowFlameToast(false);
-    }, 1200);
-  };
-
-  // Save note for a specific day
-  const handleUpdateDayNote = async (dateStr, note) => {
-    const existing = daysMap[dateStr] || {
-      date: dateStr,
-      totalScore: 0,
-      targetScore,
-      completedCount: 0,
-      tereaCount: 0
-    };
-    const updated = { ...existing, note };
-    await db.days.put(updated);
-    setDaysMap((prev) => ({ ...prev, [dateStr]: updated }));
-  };
-
-  // Update target score setting
-  const handleUpdateTargetScore = async (val) => {
-    setTargetScore(val);
-    await db.settings.put({ key: 'dailyTarget', value: val });
-    await loadData();
-  };
-
-  // Update reset hour setting
-  const handleUpdateResetHour = async (hour) => {
-    setResetHour(hour);
-    await db.settings.put({ key: 'resetHour', value: hour });
-    await loadData();
-  };
-
-  // Update Terea price per stick
-  const handleUpdateTereaPrice = async (price) => {
-    setTereaPrice(price);
-    await db.settings.put({ key: 'tereaStickPrice', value: price });
-  };
-
-  // Toggle sound effects
-  const handleToggleSound = async () => {
-    const next = !soundEnabled;
-    setSoundEnabled(next);
-    await db.settings.put({ key: 'soundEnabled', value: next });
-  };
-
-  // Save new PIN
-  const handleSavePin = async (hash) => {
-    await db.settings.put({ key: 'pinHash', value: hash });
-    await db.settings.put({ key: 'pinEnabled', value: true });
-    setStoredPinHash(hash);
-    setPinEnabled(true);
-  };
-
-  // Remove PIN
-  const handleRemovePin = async () => {
-    await db.settings.delete('pinHash');
-    await db.settings.put({ key: 'pinEnabled', value: false });
-    setStoredPinHash('');
-    setPinEnabled(false);
-    setIsAppLocked(false);
-  };
-
-  // Seed 30 days of realistic history (Both Routines + Terea Consumption)
-  const handleSeedDemoData = async () => {
-    const base = new Date();
-    const scores = [100, 85, 95, 110, 70, 100, 105, 90, 80, 100, 60, 95, 100, 115, 85, 100, 75, 90, 100, 105];
-    const tereaCounts = [12, 10, 14, 8, 15, 11, 9, 13, 10, 12, 16, 11, 10, 8, 14, 12, 9, 13, 11, 10];
-
-    for (let i = 1; i <= 30; i++) {
-      const d = new Date(base);
-      d.setDate(base.getDate() - i);
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      const dateStr = `${y}-${m}-${day}`;
-
-      const score = scores[i % scores.length];
-      const terea = tereaCounts[i % tereaCounts.length];
-
-      await db.days.put({
-        date: dateStr,
-        totalScore: score,
-        targetScore: 100,
-        completedCount: Math.floor(score / 20),
-        tereaCount: terea,
-        note: i === 3 ? 'Kütüphanede 3 saat blok çalışma yapıldı.' : ''
-      });
-
-      await db.logs.put({
-        id: `${dateStr}_demo1`,
-        date: dateStr,
-        routineId: 1,
-        title: '📚 Odaklı Mühendislik / Ders Çalışması (45 dk)',
-        weight: 25,
-        completedAt: `${dateStr}T10:00:00.000Z`
-      });
-      await db.logs.put({
-        id: `${dateStr}_demo2`,
-        date: dateStr,
-        routineId: 2,
-        title: '🏃‍♂️ Günlük Egzersiz veya 7.500 Adım',
-        weight: 20,
-        completedAt: `${dateStr}T15:00:00.000Z`
-      });
-    }
-
-    await loadData();
-  };
-
-  // Clear all past days, logs, and Terea history (keeps routines)
-  const handleClearHistory = async () => {
-    await db.days.clear();
-    await db.logs.clear();
-    await db.tereaLogs.clear();
-    setCompletedMap({});
-    setQuantityMap({});
-    setCurrentScore(0);
-    setTodayTereaSticks(0);
-    setDaysMap({});
-    setCategoryScoresMap({});
-    setStreak(0);
-    setFreezeUsed(false);
-    await loadData();
-  };
-
-  // Reset entire application to initial state with clean default routines
-  const handleResetToDefaults = async () => {
-    await db.days.clear();
-    await db.logs.clear();
-    await db.tereaLogs.clear();
-    await db.routines.clear();
-    await db.routines.bulkAdd(DEFAULT_ROUTINES);
-    setCompletedMap({});
-    setQuantityMap({});
-    setCurrentScore(0);
-    setTodayTereaSticks(0);
-    setDaysMap({});
-    setCategoryScoresMap({});
-    setStreak(0);
-    setFreezeUsed(false);
-    await loadData();
-  };
+  }
 
   return (
-    <div className={`min-h-screen bg-[#0f1014] text-[#f1f2f6] flex flex-col font-sans selection:bg-neutral-800 ${privacyMode ? 'privacy-active' : ''}`}>
-      {/* Top Header */}
-      <Header
-        todayStr={todayStr}
-        currentScore={currentScore}
-        targetScore={targetScore}
-        streak={streak}
-        freezeUsed={freezeUsed}
-        todayTereaSticks={todayTereaSticks}
-        tereaPrice={tereaPrice}
-        privacyMode={privacyMode}
-        onTogglePrivacy={() => setPrivacyMode((p) => !p)}
-        onOpenSettings={() => setIsSettingsModalOpen(true)}
-        onOpenBadges={() => setIsBadgesModalOpen(true)}
-        onToggleView={() => setCurrentView((v) => (v === 'routines' ? 'tracker' : 'routines'))}
-        currentView={currentView}
-      />
+    <div
+      className={`min-h-screen transition-colors duration-200 select-none pb-24 ${
+        isDark ? 'bg-black text-white' : 'bg-[#f2f2f7] text-neutral-900'
+      }`}
+    >
+      <main className="max-w-md mx-auto px-4 safe-top">
+        {/* Navigation Header */}
+        <Header
+          onOpenAnalytics={() => setIsAnalyticsOpen(true)}
+          onOpenSettings={() => setIsSettingsOpen(true)}
+          isDark={isDark}
+        />
 
-      {/* Main Container */}
-      <main className="flex-1 max-w-md w-full mx-auto px-4 pt-3 pb-36 space-y-4">
-        {currentView === 'routines' ? (
-          <>
-            {/* 1. Primary Focus: Routine & Daily Task List */}
-            <RoutineList
-              routines={routines}
-              completedMap={completedMap}
-              quantityMap={quantityMap}
-              onToggleRoutine={handleToggleRoutine}
-              onDeleteRoutine={handleDeleteRoutine}
-              onEditRoutine={handleOpenEditRoutine}
-              onOpenAddModal={() => {
-                setEditingRoutine(null);
-                setIsAddModalOpen(true);
-              }}
-              onUpdateQuantity={handleUpdateQuantity}
-              onToggleMit={handleToggleMit}
-              onToggleFreeze={handleToggleFreeze}
-              onToggleSubtask={handleToggleSubtask}
-            />
+        {/* Hero Budget & Daily Allowance Summary Card */}
+        <BudgetSummaryCard metrics={metrics} isDark={isDark} />
 
-            {/* 2. Secondary Widget: Terea Counter & Spending Engine (Collapsible for Clean Minimalism) */}
-            <div className="pt-2">
-              <button
-                type="button"
-                onClick={() => setShowTereaDetails((prev) => !prev)}
-                className="w-full py-3.5 px-5 rounded-2xl bg-[#14151a] border border-[#23252e] hover:border-neutral-600 text-sm font-bold text-neutral-300 hover:text-white flex items-center justify-between transition-all spring-click"
-              >
-                <span className="flex items-center gap-2.5">
-                  <span className="text-base">🔥</span>
-                  <span>Terea Harcama & Detay Analizi</span>
-                </span>
-                <span className="text-neutral-300 font-mono text-xs font-bold privacy-blur">
-                  {showTereaDetails ? 'Gizle ▲' : `${todayTereaSticks} Dal • ${(todayTereaSticks * tereaPrice).toFixed(0)} TL ▼`}
-                </span>
-              </button>
+        {/* 2 Primary Tactile Fast Action Cards (IQOS & Yemek Kartı) */}
+        <QuickActionCards
+          iqosPrice={settings.iqosPrice}
+          onAddIqos={handleAddIqos}
+          onOpenYemekKarti={() => setIsYemekKartiOpen(true)}
+          isDark={isDark}
+        />
 
-              {showTereaDetails && (
-                <div className="mt-3 animate-fade-in">
-                  <TereaWidget
-                    todaySticks={todayTereaSticks}
-                    stickPrice={tereaPrice}
-                    stats={tereaStats}
-                    onIncrement={handleIncrementTerea}
-                    onDecrement={handleDecrementTerea}
-                    onOpenSettings={() => setIsSettingsModalOpen(true)}
-                  />
-                </div>
-              )}
-            </div>
-          </>
-        ) : (
-          <TrackerHeatmap
-            daysMap={daysMap}
-            todayStr={todayStr}
-            targetScore={targetScore}
-            tereaPrice={tereaPrice}
-            categoryScoresMap={categoryScoresMap}
-            onSelectDay={(date) => setSelectedDay(date)}
-            onSeedDemoData={handleSeedDemoData}
-            onClearHistory={handleClearHistory}
-          />
-        )}
+        {/* Expense Flow List */}
+        <ExpenseList
+          expenses={expenses}
+          onDeleteExpense={handleDeleteExpense}
+          todayStr={todayStr}
+          isDark={isDark}
+        />
       </main>
 
-      {/* Floating Fast Terea Counter Button (Flame FAB - Enlarged & Tactile) */}
-      {currentView === 'routines' && (
-        <div className="fixed bottom-24 right-5 z-40 flex flex-col items-end pointer-events-auto">
-          {showFlameToast && (
-            <div className="mb-2.5 px-3.5 py-2 rounded-full bg-amber-500 text-black text-sm font-black shadow-2xl animate-bounce pointer-events-none flex items-center gap-1.5">
-              <span>+1 Dal Eklendi</span>
-              <span>🔥</span>
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={handleFastTereaClick}
-            aria-label="1 Dal Terea Ekle"
-            className="w-16 h-16 rounded-full bg-[#181920]/95 backdrop-blur-xl border-2 border-amber-500/70 shadow-2xl shadow-amber-500/40 flex items-center justify-center text-amber-400 hover:scale-105 active:scale-90 transition-all spring-click focus:outline-none"
-            title="Hızlı 1 Dal Terea Ekle (+1)"
-          >
-            <span className="text-3xl select-none filter drop-shadow">🔥</span>
-          </button>
-        </div>
-      )}
+      {/* Floating Action '+' Button for Free Entry */}
+      <div className="fixed bottom-6 right-5 z-30 safe-bottom">
+        <button
+          type="button"
+          onClick={() => {
+            triggerHaptic('medium');
+            soundEngine.playPop();
+            setIsAddExpenseOpen(true);
+          }}
+          className={`w-14 h-14 rounded-full flex items-center justify-center spring-tap shadow-lg border transition-transform ${
+            isDark
+              ? 'bg-white text-black border-neutral-300 hover:bg-neutral-200 shadow-white/10 active:scale-95'
+              : 'bg-neutral-900 text-white border-neutral-800 hover:bg-black shadow-black/20 active:scale-95'
+          }`}
+          title="Hızlı Harcama Ekle"
+          aria-label="Hızlı Harcama Ekle"
+        >
+          <Plus className="w-7 h-7 stroke-[2.6]" />
+        </button>
+      </div>
 
-      {/* Mobile Floating Action & Bottom Bar (More Accessible & Larger Touch Targets) */}
-      <nav className="fixed bottom-0 left-0 right-0 z-30 bg-[#0f1014]/95 backdrop-blur-2xl border-t border-[#23252e] px-8 py-2.5 safe-bottom">
-        <div className="max-w-md mx-auto flex items-center justify-between">
-          <button
-            onClick={() => setCurrentView('routines')}
-            className={`flex flex-col items-center gap-1.5 p-2 rounded-2xl transition-colors spring-click ${
-              currentView === 'routines' ? 'text-white' : 'text-neutral-400 hover:text-neutral-200'
-            }`}
-          >
-            <CheckSquare className="w-6 h-6 stroke-[2.5]" />
-            <span className="text-xs font-black tracking-tight">Görevler</span>
-          </button>
-
-          {/* Center Quick Add FAB (Larger & More Accessible) */}
-          <button
-            onClick={() => {
-              setEditingRoutine(null);
-              setIsAddModalOpen(true);
-            }}
-            aria-label="Yeni Rutin Ekle"
-            className="w-14 h-14 -mt-7 rounded-full bg-white text-black flex items-center justify-center shadow-xl shadow-white/15 hover:bg-neutral-200 active:scale-95 transition-all spring-click"
-          >
-            <Plus className="w-7 h-7 stroke-[3]" />
-          </button>
-
-          <button
-            onClick={() => setCurrentView('tracker')}
-            className={`flex flex-col items-center gap-1.5 p-2 rounded-2xl transition-colors spring-click ${
-              currentView === 'tracker' ? 'text-emerald-400' : 'text-neutral-400 hover:text-neutral-200'
-            }`}
-          >
-            <BarChart2 className="w-6 h-6 stroke-[2.5]" />
-            <span className="text-xs font-black tracking-tight">Geçmiş & Isı</span>
-          </button>
-        </div>
-      </nav>
-
-      {/* Modals */}
-      <QuickAddModal
-        isOpen={isAddModalOpen}
-        onClose={handleCloseAddModal}
-        onAddRoutine={handleAddRoutine}
-        onUpdateRoutine={handleUpdateRoutine}
-        editingRoutine={editingRoutine}
-        existingRoutines={routines}
+      {/* Undo Toast Notification */}
+      <UndoToast
+        lastExpense={lastExpense}
+        onUndo={handleUndo}
+        onDismiss={() => setLastExpense(null)}
+        isDark={isDark}
       />
 
-      <DayDetailModal
-        dateStr={selectedDay}
-        dayRecord={selectedDay ? daysMap[selectedDay] : null}
-        tereaPrice={tereaPrice}
-        onClose={() => setSelectedDay(null)}
-        onUpdateDayNote={handleUpdateDayNote}
+      {/* Yemek Kartı Bottom Sheet */}
+      <YemekKartiSheet
+        isOpen={isYemekKartiOpen}
+        onClose={() => setIsYemekKartiOpen(false)}
+        onSave={handleSaveYemekKarti}
+        isDark={isDark}
       />
 
+      {/* Add Custom Expense Bottom Sheet */}
+      <AddExpenseSheet
+        isOpen={isAddExpenseOpen}
+        onClose={() => setIsAddExpenseOpen(false)}
+        onSave={handleSaveCustomExpense}
+        recentSuggestions={suggestions}
+        isDark={isDark}
+      />
+
+      {/* Analytics Modal */}
+      <AnalyticsModal
+        isOpen={isAnalyticsOpen}
+        onClose={() => setIsAnalyticsOpen(false)}
+        metrics={metrics}
+        isDark={isDark}
+      />
+
+      {/* Settings Modal */}
       <SettingsModal
-        isOpen={isSettingsModalOpen}
-        onClose={() => setIsSettingsModalOpen(false)}
-        targetScore={targetScore}
-        onUpdateTargetScore={handleUpdateTargetScore}
-        resetHour={resetHour}
-        onUpdateResetHour={handleUpdateResetHour}
-        tereaStickPrice={tereaPrice}
-        onUpdateTereaPrice={handleUpdateTereaPrice}
-        soundEnabled={soundEnabled}
-        onToggleSound={handleToggleSound}
-        onSeedDemoData={handleSeedDemoData}
-        onClearHistory={handleClearHistory}
-        onResetAllData={handleResetToDefaults}
-        onReloadData={loadData}
-        pinEnabled={pinEnabled}
-        storedPinHash={storedPinHash}
-        onSavePin={handleSavePin}
-        onRemovePin={handleRemovePin}
-        routines={routines}
-        onDeleteRoutine={handleDeleteRoutine}
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        settings={settings}
+        onUpdateSetting={handleUpdateSetting}
+        onDataReset={() => {
+          setExpenses([]);
+          setLastExpense(null);
+        }}
+        isDark={isDark}
       />
-
-      <BadgesModal
-        isOpen={isBadgesModalOpen}
-        onClose={() => setIsBadgesModalOpen(false)}
-        totalScore={currentScore}
-        streak={streak}
-      />
-
-      {/* App Startup PIN Security Lock Screen */}
-      {isAppLocked && pinEnabled && storedPinHash && (
-        <PinLockScreen
-          isOpen={true}
-          mode="unlock"
-          storedPinHash={storedPinHash}
-          onSuccess={() => setIsAppLocked(false)}
-        />
-      )}
     </div>
   );
 }

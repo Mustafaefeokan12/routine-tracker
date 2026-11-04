@@ -1,11 +1,11 @@
 {
-  "name": "Routine & Score Tracker",
-  "short_name": "RoutineTrack",
-  "description": "Kişisel günlük rutin, to-do ve performans puanı takipçisi",
+  "name": "Budget",
+  "short_name": "Budget",
+  "description": "Minimalist Apple Arayüzlü Harcama ve Günlük Bütçe Takipçisi",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#09090b",
-  "theme_color": "#09090b",
+  "background_color": "#000000",
+  "theme_color": "#000000",
   "orientation": "portrait-primary",
   "icons": [
     {

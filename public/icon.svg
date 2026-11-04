@@ -1,9 +1,28 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <rect width="512" height="512" rx="128" fill="#09090b"/>
-  <rect x="24" y="24" width="464" height="464" rx="104" fill="none" stroke="#27272a" stroke-width="8"/>
-  <!-- Circular Target / Progress Ring -->
-  <circle cx="256" cy="256" r="140" fill="none" stroke="#27272a" stroke-width="24"/>
-  <path d="M 256 116 A 140 140 0 1 1 136.5 329" fill="none" stroke="#10b981" stroke-width="24" stroke-linecap="round"/>
-  <!-- Elegant Checkmark -->
-  <path d="M 190 260 L 235 305 L 330 195" fill="none" stroke="#ffffff" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  <defs>
+    <linearGradient id="appleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1c1c1e"/>
+      <stop offset="100%" stop-color="#000000"/>
+    </linearGradient>
+    <linearGradient id="accentGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Apple Squircle Background -->
+  <rect width="512" height="512" rx="116" fill="url(#appleGradient)"/>
+  <rect x="16" y="16" width="480" height="480" rx="100" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="4"/>
+
+  <!-- Minimalist Activity Circle Ring -->
+  <circle cx="256" cy="256" r="148" fill="none" stroke="#27272a" stroke-width="20"/>
+  <path d="M 256 108 A 148 148 0 1 1 140 348" fill="none" stroke="url(#accentGradient)" stroke-width="20" stroke-linecap="round"/>
+
+  <!-- Stylized Minimalist TL / Currency Symbol -->
+  <!-- Vertical stem -->
+  <path d="M 230 170 L 230 342 C 230 354 240 364 256 364 C 290 364 316 342 316 312" fill="none" stroke="#ffffff" stroke-width="24" stroke-linecap="round"/>
+  <!-- Top bar -->
+  <path d="M 200 220 L 280 200" fill="none" stroke="#ffffff" stroke-width="22" stroke-linecap="round"/>
+  <!-- Lower bar -->
+  <path d="M 195 264 L 275 244" fill="none" stroke="#ffffff" stroke-width="22" stroke-linecap="round"/>
 </svg>
