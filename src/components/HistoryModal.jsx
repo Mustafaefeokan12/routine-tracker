@@ -52,18 +52,23 @@ export default function HistoryModal({ isOpen, onClose, history = [], isDark }) 
 
         {/* Scrollable Day List */}
         <div className="overflow-y-auto no-scrollbar space-y-2.5 flex-1 pr-0.5">
-          {history.map((day) => {
-            const isExpanded = expandedDate === day.dateStr;
+          {history.length === 0 ? (
+            <p className={`text-xs text-center py-8 ${isDark ? 'text-neutral-500' : 'text-neutral-400'}`}>
+              Henüz geçmiş kayıt bulunmuyor.
+            </p>
+          ) : (
+            history.map((day) => {
+              const isExpanded = expandedDate === day.dateStr;
 
-            return (
-              <div
-                key={day.dateStr}
-                className={`rounded-2xl border transition-all overflow-hidden ${
-                  isDark
-                    ? 'bg-neutral-800/40 border-neutral-800 hover:border-neutral-700'
-                    : 'bg-neutral-50 border-neutral-200/80 hover:border-neutral-300'
-                }`}
-              >
+              return (
+                <div
+                  key={day.dateStr}
+                  className={`rounded-2xl border transition-all overflow-hidden ${
+                    isDark
+                      ? 'bg-neutral-800/40 border-neutral-800 hover:border-neutral-700'
+                      : 'bg-neutral-50 border-neutral-200/80 hover:border-neutral-300'
+                  }`}
+                >
                 {/* Day Header Row */}
                 <button
                   type="button"
@@ -139,7 +144,7 @@ export default function HistoryModal({ isOpen, onClose, history = [], isDark }) 
                 )}
               </div>
             );
-          })}
+          }))}
         </div>
       </div>
     </div>

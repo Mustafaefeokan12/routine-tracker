@@ -1,69 +1,84 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import './index.css'
-import App from './App.jsx'
+import React, { StrictMode, Component } from 'react';
+import { createRoot } from 'react-dom/client';
+import './index.css';
+import App from './App.jsx';
+
+// Apple Minimalist Error Boundary
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('App Crash Error:', error, errorInfo);
+  }
+
+  handleRestart = () => {
+    window.location.reload();
+  };
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-black text-white flex items-center justify-center p-6 text-center">
+          <div className="max-w-sm w-full bg-neutral-900 border border-neutral-800 rounded-3xl p-6 shadow-2xl">
+            <div className="text-4xl mb-3">⚠️</div>
+            <h1 className="text-lg font-bold tracking-tight mb-1">
+              Budget Başlatılamadı
+            </h1>
+            <p className="text-xs text-neutral-400 mb-4 leading-relaxed">
+              Uygulama yüklenirken bir sorun oluştu. Verileriniz güvendedir.
+            </p>
+            <div className="p-3 rounded-xl bg-neutral-950 text-[11px] font-mono text-rose-400 mb-5 break-all text-left max-h-32 overflow-y-auto">
+              {this.state.error?.message || 'Bilinmeyen Hata'}
+            </div>
+            <button
+              type="button"
+              onClick={this.handleRestart}
+              className="w-full py-3 rounded-2xl bg-white text-black font-bold text-sm spring-tap active:scale-95"
+            >
+              Yeniden Başlat
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <App />
-  </StrictMode>,
-)
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
+  </StrictMode>
+);
 
-// Automatic In-Place Hot-Update Engine for PWA & iOS Safari
-if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
-  // Check GitHub server for newly deployed builds
-  const checkForLiveUpdate = async () => {
-    try {
-      // 1. Force SW update check without using browser HTTP cache
-      if ('serviceWorker' in navigator) {
-        const reg = await navigator.serviceWorker.getRegistration();
-        if (reg) {
-          await reg.update().catch(() => {});
-          if (reg.waiting) {
-            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+// Clean Service Worker Registration
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register('./sw.js')
+      .then((reg) => {
+        // Check for updates when app gains focus
+        const updateSW = () => {
+          reg.update().catch(() => {});
+        };
+
+        window.addEventListener('focus', updateSW);
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') {
+            updateSW();
           }
-        }
-      }
+        });
 
-      // 2. Fetch fresh index.html directly from GitHub bypassing all browser & CDN caches
-      const res = await fetch('./index.html?_t=' + Date.now(), {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache'
-        }
-      });
-      if (!res.ok) return;
-      const html = await res.text();
-
-      // Extract script filename from live HTML (e.g. index-ABC123.js)
-      const match = html.match(/src="(\.\/assets\/index-[^"]+\.js)"/);
-      if (match && match[1]) {
-        const liveScript = match[1];
-        const currentScriptTag = document.querySelector('script[src*="/assets/index-"]');
-        const currentScript = currentScriptTag ? currentScriptTag.getAttribute('src') : null;
-
-        // If a new build is deployed on GitHub, purge caches and reload automatically
-        if (currentScript && liveScript && currentScript !== liveScript) {
-          console.log('[AutoUpdate] Newer version found:', liveScript, 'Reloading app...');
-          if ('caches' in window) {
-            const keys = await caches.keys();
-            await Promise.all(keys.map((k) => caches.delete(k)));
-          }
-          window.location.reload();
-        }
-      }
-    } catch {
-      // Silent catch for offline moments
-    }
-  };
-
-  // Register service worker with updateViaCache: 'none' (disallows 10-minute HTTP disk caching)
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((reg) => {
-        reg.update().catch(() => {});
-
+        // If a new service worker is waiting, activate it
         if (reg.waiting) {
           reg.waiting.postMessage({ type: 'SKIP_WAITING' });
         }
@@ -78,31 +93,9 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
             });
           }
         });
-      }).catch((err) => {
-        console.warn('SW registration failed:', err);
+      })
+      .catch((err) => {
+        console.warn('SW register warning:', err);
       });
-
-      let refreshing = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (!refreshing) {
-          refreshing = true;
-          window.location.reload();
-        }
-      });
-
-      // Check for updates 2 seconds after load
-      setTimeout(checkForLiveUpdate, 2000);
-
-      // Check every 15 seconds in background
-      setInterval(checkForLiveUpdate, 15000);
-
-      // Check immediately when user unlocks phone or switches back to app tab
-      document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') {
-          checkForLiveUpdate();
-        }
-      });
-      window.addEventListener('focus', checkForLiveUpdate);
-    });
-  }
+  });
 }

@@ -3,18 +3,17 @@ import { formatCurrency } from '../utils/budget';
 import { ArrowUpRight, ArrowDownRight, Sparkles, Calendar } from 'lucide-react';
 
 export default function BudgetSummaryCard({ metrics, isDark }) {
+  if (!metrics) return null;
+
   const {
-    monthlyIncome,
-    dailyAllowance,
-    todayTotalSpent,
-    todayNet,
-    isTodaySurplus,
-    cycleTotalSpent,
-    cycleRemaining,
-    cyclePercentSpent,
-    cycle,
-    isBalanceActive,
-    daysLeftInPeriod
+    dailyAllowance = 0,
+    todayNet = 0,
+    isTodaySurplus = true,
+    cycleRemaining = 0,
+    cyclePercentSpent = 0,
+    cycle = { startLabel: '', endLabel: '', remainingDays: 0 },
+    isBalanceActive = false,
+    daysLeftInPeriod = 0
   } = metrics;
 
   return (

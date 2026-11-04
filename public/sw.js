@@ -1,4 +1,4 @@
-const CACHE_NAME = 'budget-v1.4';
+const CACHE_NAME = 'budget-v1.6';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -12,12 +12,14 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
+      return cache.addAll(STATIC_ASSETS).catch((err) => {
+        console.warn('SW pre-cache warning:', err);
+      });
     })
   );
 });
 
-// Activate: delete any old versioned caches and take control immediately
+// Activate: delete old versioned caches and take control
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
@@ -32,20 +34,20 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Support manual skip-waiting from client
+// Support manual skip-waiting
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
 });
 
-// Fetch: Network-First for HTML/navigation with no-cache validation; Stale-While-Revalidate for static assets
+// Fetch Handler: Bulletproof Network-First for HTML, Stale-While-Revalidate for Assets
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
   const url = new URL(event.request.url);
 
-  // Bypass cache completely for timestamped update-check queries
+  // Bypass cache completely for timestamped update queries
   if (url.searchParams.has('_t') || url.searchParams.has('_cb')) {
     event.respondWith(fetch(event.request, { cache: 'no-store' }));
     return;
@@ -55,56 +57,59 @@ self.addEventListener('fetch', (event) => {
     (event.request.headers.get('accept') && event.request.headers.get('accept').includes('text/html'));
 
   if (isNavigation) {
-    // Instant launch: Serve cached shell immediately in <15ms, revalidate in background
+    // Navigation: Network first, fall back to cached index.html. Never return null!
     event.respondWith(
-      caches.match(event.request).then((cached) => {
-        const networkFetch = fetch(new Request(event.request, { cache: 'no-cache' }))
-          .then((networkResponse) => {
-            if (networkResponse && networkResponse.status === 200) {
-              const copy = networkResponse.clone();
-              caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-            }
-            return networkResponse;
-          })
-          .catch(() => null);
-
-        if (cached) {
-          event.waitUntil(networkFetch);
-          return cached;
-        }
-
-        return caches.match('./index.html').then((shell) => {
-          if (shell) {
-            event.waitUntil(networkFetch);
-            return shell;
-          }
-          return networkFetch;
-        });
-      })
-    );
-    return;
-  }
-
-  // Stale-while-revalidate for hashed bundle assets, fonts, icons
-  event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      const fetchPromise = fetch(event.request)
+      fetch(event.request)
         .then((networkResponse) => {
-          if (
-            networkResponse &&
-            networkResponse.status === 200 &&
-            (event.request.url.startsWith(self.location.origin) ||
-             event.request.url.includes('fonts.googleapis.com') ||
-             event.request.url.includes('fonts.gstatic.com'))
-          ) {
+          if (networkResponse && networkResponse.status === 200) {
             const copy = networkResponse.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
           }
           return networkResponse;
         })
-        .catch(() => cachedResponse);
+        .catch(async () => {
+          const cached = await caches.match(event.request);
+          if (cached) return cached;
+          const fallback = await caches.match('./index.html');
+          if (fallback) return fallback;
+          return new Response('<!doctype html><html><body>Yeniden bağlanılıyor...</body></html>', {
+            status: 200,
+            headers: { 'Content-Type': 'text/html' }
+          });
+        })
+    );
+    return;
+  }
 
-      return cachedResponse || fetchPromise;
+  // Assets (JS, CSS, Icons, Fonts): Cache first, network fallback
+  event.respondWith(
+    caches.match(event.request).then((cachedResponse) => {
+      if (cachedResponse) {
+        // Revalidate in background if origin matches
+        if (event.request.url.startsWith(self.location.origin)) {
+          fetch(event.request)
+            .then((networkResponse) => {
+              if (networkResponse && networkResponse.status === 200) {
+                const copy = networkResponse.clone();
+                caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+              }
+            })
+            .catch(() => {});
+        }
+        return cachedResponse;
+      }
+
+      return fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const copy = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          return new Response('', { status: 404, statusText: 'Not Found' });
+        });
     })
   );
 });

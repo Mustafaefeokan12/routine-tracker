@@ -8,7 +8,8 @@ import {
 } from './db';
 import {
   computeBudgetMetrics,
-  getTodayString
+  getTodayString,
+  computeDailyHistory
 } from './utils/budget';
 import { triggerHaptic, soundEngine } from './utils/haptics';
 
@@ -28,7 +29,6 @@ export default function App() {
   const [expenses, setExpenses] = useState([]);
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [suggestions, setSuggestions] = useState([]);
-  const [isLoaded, setIsLoaded] = useState(false);
 
   // Modals
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -40,28 +40,35 @@ export default function App() {
   // Undo Toast state
   const [lastExpense, setLastExpense] = useState(null);
 
-  // Load Database & Settings
+  // Load Database & Settings with Fault-Tolerant Fallback
   const loadData = useCallback(async () => {
     try {
-      await initDatabase();
+      await initDatabase().catch((e) => console.warn('initDB warning:', e));
 
       const [loadedExpenses, loadedSettings, loadedSuggestions] = await Promise.all([
-        db.expenses.orderBy('timestamp').reverse().toArray(),
-        db.settings.toArray(),
-        db.suggestions.orderBy('useCount').reverse().limit(5).toArray()
+        db.expenses.orderBy('timestamp').reverse().toArray().catch(() => db.expenses.toArray()).catch(() => []),
+        db.settings.toArray().catch(() => []),
+        db.suggestions.orderBy('useCount').reverse().limit(5).toArray().catch(() => [])
       ]);
 
       const settingsMap = { ...DEFAULT_SETTINGS };
-      for (const item of loadedSettings) {
-        settingsMap[item.key] = item.value;
+      if (Array.isArray(loadedSettings)) {
+        for (const item of loadedSettings) {
+          if (item && item.key) {
+            settingsMap[item.key] = item.value;
+          }
+        }
       }
 
-      setExpenses(loadedExpenses);
+      setExpenses(loadedExpenses || []);
       setSettings(settingsMap);
-      setSuggestions(loadedSuggestions);
-      setIsLoaded(true);
+      setSuggestions(loadedSuggestions || []);
     } catch (err) {
-      console.error('Veri yükleme hatası:', err);
+      console.warn('Veri yükleme hatası (fallback devrede):', err);
+      setExpenses([]);
+      setSettings(DEFAULT_SETTINGS);
+    } finally {
+      setIsLoaded(true);
     }
   }, []);
 
@@ -211,16 +218,6 @@ export default function App() {
     await setSetting(key, value);
     setSettings((prev) => ({ ...prev, [key]: value }));
   };
-
-  if (!isLoaded) {
-    return (
-      <div className={`min-h-screen flex items-center justify-center ${
-        isDark ? 'bg-black text-white' : 'bg-[#f2f2f7] text-neutral-900'
-      }`}>
-        <div className="w-6 h-6 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
 
   return (
     <div
