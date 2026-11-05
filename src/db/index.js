@@ -14,6 +14,7 @@ export const DEFAULT_SETTINGS = {
   iqosPrice: 220,
   currentBalance: 7500, // 4 Kasım itibarıyla hesapta kalan nakit
   balanceSetDate: '2026-11-04',
+  balanceSetTimestamp: null,
   theme: 'dark', // 'dark' | 'light' | 'system'
   dailyNotification: false,
   notificationTime: '22:00'

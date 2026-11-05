@@ -162,6 +162,80 @@ describe('Budget Financial Engine & Date Calculations', () => {
     assert.equal(Math.round(metricsDay2.dailyAllowance * 100) / 100, 493.33);
   });
 
+  test('Bank balance manual sync: preserves all past expenses while instantly recalibrating remaining cash & allowance', () => {
+    // User made expenses on Nov 4 & Nov 5:
+    const expenses = [
+      { id: 1, title: 'IQOS', amount: 220, category: 'Tütün / IQOS', date: '2026-11-04', timestamp: new Date(2026, 10, 4, 12, 0).getTime() },
+      { id: 2, title: 'Yemek', amount: 150, category: 'Yemek & Restoran', date: '2026-11-05', timestamp: new Date(2026, 10, 5, 13, 0).getTime() }
+    ];
+
+    // On Nov 6 15:00: User checks their bank account, sees 8.000 TL (maybe extra money entered), and syncs it.
+    const syncTime = new Date(2026, 10, 6, 15, 0).getTime();
+    const metricsSynced = computeBudgetMetrics({
+      expenses,
+      monthlyIncome: 28000,
+      salaryDay: 20,
+      currentBalance: 8000,
+      balanceSetDate: '2026-11-06',
+      balanceSetTimestamp: syncTime,
+      targetDate: new Date(2026, 10, 6, 15, 1),
+      resetHour: 6
+    });
+
+    // 14 days remaining (Nov 6 to Nov 19 inclusive)
+    assert.equal(metricsSynced.daysLeftInPeriod, 14);
+    assert.equal(metricsSynced.cycleRemaining, 8000); // Instantly matches bank!
+    assert.equal(Math.round(metricsSynced.dailyAllowance * 100) / 100, Math.round((8000 / 14) * 100) / 100);
+    assert.equal(metricsSynced.isTodaySurplus, true);
+
+    // If a new expense is made AFTER the sync on Nov 6 16:30:
+    const updatedExpenses = [
+      ...expenses,
+      { id: 3, title: 'Kahve', amount: 100, category: 'Kahve & Kafe', date: '2026-11-06', timestamp: new Date(2026, 10, 6, 16, 30).getTime() }
+    ];
+
+    const metricsAfterExpense = computeBudgetMetrics({
+      expenses: updatedExpenses,
+      monthlyIncome: 28000,
+      salaryDay: 20,
+      currentBalance: 8000,
+      balanceSetDate: '2026-11-06',
+      balanceSetTimestamp: syncTime,
+      targetDate: new Date(2026, 10, 6, 17, 0),
+      resetHour: 6
+    });
+
+    assert.equal(metricsAfterExpense.cycleRemaining, 7900); // 8000 - 100
+    assert.equal(metricsAfterExpense.todayTotalSpent, 100);
+    assert.equal(metricsAfterExpense.todayNet, metricsAfterExpense.dailyAllowance - 100);
+
+    // All past expenses (id 1, 2, 3) are still preserved intact in the array!
+    assert.equal(updatedExpenses.length, 3);
+  });
+
+  test('Calendar history minDate excludes all days prior to Nov 4', () => {
+    const expenses = [
+      { id: 1, title: 'IQOS', amount: 220, category: 'Tütün / IQOS', date: '2026-11-04', timestamp: Date.now() }
+    ];
+
+    // Today is Nov 6, user requests up to 14 days back, but minDate is 2026-11-04
+    const history = computeDailyHistory({
+      expenses,
+      dailyAllowance: 468.75,
+      targetDate: new Date(2026, 10, 6, 12, 0),
+      resetHour: 6,
+      daysCount: 14,
+      minDate: '2026-11-04'
+    });
+
+    // Should ONLY return Nov 6, Nov 5, Nov 4 (exactly 3 days, no Nov 3 or earlier!)
+    assert.equal(history.length, 3);
+    assert.equal(history[0].dateStr, '2026-11-06');
+    assert.equal(history[1].dateStr, '2026-11-05');
+    assert.equal(history[2].dateStr, '2026-11-04');
+    assert.ok(history.every(day => day.dateStr >= '2026-11-04'));
+  });
+
   test('Computes today net balance (+ when under allowance, - when overspent)', () => {
     const today = new Date();
     const todayStr = getTodayString(today);

@@ -1,6 +1,6 @@
 import React from 'react';
 import { formatCurrency } from '../utils/budget';
-import { ArrowUpRight, ArrowDownRight, Sparkles, Calendar } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Calendar } from 'lucide-react';
 
 export default function BudgetSummaryCard({ metrics, isDark }) {
   if (!metrics) return null;
@@ -24,18 +24,6 @@ export default function BudgetSummaryCard({ metrics, isDark }) {
           : 'bg-white border border-neutral-200/80 text-neutral-900 shadow-sm'
       }`}
     >
-      {/* Top Banner when Mid-Cycle Active Balance is set */}
-      {isBalanceActive && (
-        <div className={`flex items-center gap-2 mb-3.5 px-3 py-1.5 rounded-xl text-xs font-semibold ${
-          isDark
-            ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
-            : 'bg-cyan-50 text-cyan-800 border border-cyan-200'
-        }`}>
-          <Sparkles className="w-3.5 h-3.5 shrink-0" />
-          <span>20 Kasım'a kadar {formatCurrency(metrics.monthlyIncome, true)} bütçe devrede ({daysLeftInPeriod} gün)</span>
-        </div>
-      )}
-
       {/* Today's Net Indicator Pill */}
       <div className="flex items-center justify-between gap-3 mb-4">
         <div>

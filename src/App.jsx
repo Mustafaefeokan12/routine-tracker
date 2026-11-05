@@ -113,10 +113,18 @@ export default function App() {
       salaryDay: settings.salaryDay,
       currentBalance: settings.currentBalance,
       balanceSetDate: settings.balanceSetDate,
+      balanceSetTimestamp: settings.balanceSetTimestamp,
       resetHour: 6,
       targetDate: new Date()
     });
-  }, [expenses, settings.monthlyIncome, settings.salaryDay, settings.currentBalance, settings.balanceSetDate]);
+  }, [
+    expenses,
+    settings.monthlyIncome,
+    settings.salaryDay,
+    settings.currentBalance,
+    settings.balanceSetDate,
+    settings.balanceSetTimestamp
+  ]);
 
   // Daily Spending History for Calendar Modal
   const history = useMemo(() => {
@@ -129,7 +137,8 @@ export default function App() {
       balanceSetDate: settings.balanceSetDate,
       targetDate: new Date(),
       resetHour: 6,
-      daysCount: 16
+      daysCount: 30,
+      minDate: '2026-11-04'
     });
   }, [
     expenses,
@@ -325,6 +334,7 @@ export default function App() {
         onClose={() => setIsAnalyticsOpen(false)}
         metrics={metrics}
         isDark={isDark}
+        expenses={expenses}
       />
 
       {/* Settings Modal */}

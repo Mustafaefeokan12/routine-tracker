@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Moon, Sun, Monitor, Bell, Download, Trash2, Check, Settings as SettingsIcon } from 'lucide-react';
 import { triggerHaptic, soundEngine } from '../utils/haptics';
 import { exportAllData, clearAllExpenses } from '../db';
+import { getTodayString } from '../utils/budget';
 
 export default function SettingsModal({
   isOpen,
@@ -18,17 +19,40 @@ export default function SettingsModal({
   const [theme, setTheme] = useState(settings.theme || 'dark');
   const [notificationEnabled, setNotificationEnabled] = useState(!!settings.dailyNotification);
   const [showConfirmReset, setShowConfirmReset] = useState(false);
+  const [isSynced, setIsSynced] = useState(false);
 
   if (!isOpen) return null;
+
+  const handleSyncBankBalance = () => {
+    const val = Number(currentBalance);
+    if (isNaN(val)) return;
+    triggerHaptic('success');
+    soundEngine.playSuccess();
+    const todayStr = getTodayString(new Date(), 6);
+    const now = Date.now();
+    onUpdateSetting('currentBalance', val);
+    onUpdateSetting('balanceSetDate', todayStr);
+    onUpdateSetting('balanceSetTimestamp', now);
+    setIsSynced(true);
+    setTimeout(() => setIsSynced(false), 3000);
+  };
 
   const handleSaveFinancials = () => {
     triggerHaptic('success');
     soundEngine.playSuccess();
+    const newBalance = Number(currentBalance);
+    const isBalanceChanged = newBalance !== Number(settings.currentBalance);
+    const todayStr = getTodayString(new Date(), 6);
+    const now = Date.now();
+
     onUpdateSetting('monthlyIncome', Number(income) || 28000);
     onUpdateSetting('salaryDay', Math.min(31, Math.max(1, Number(salaryDay) || 20)));
     onUpdateSetting('iqosPrice', Number(iqosPrice) || 220);
-    onUpdateSetting('currentBalance', Number(currentBalance) || 7500);
-    onUpdateSetting('balanceSetDate', settings.balanceSetDate || '2026-11-04');
+    onUpdateSetting('currentBalance', newBalance);
+    if (isBalanceChanged) {
+      onUpdateSetting('balanceSetDate', todayStr);
+      onUpdateSetting('balanceSetTimestamp', now);
+    }
     onClose();
   };
 
@@ -131,25 +155,48 @@ export default function SettingsModal({
             <div className={`p-4 rounded-2xl border space-y-3 ${
               isDark ? 'bg-neutral-800/40 border-neutral-800' : 'bg-neutral-50 border-neutral-200/80'
             }`}>
+              {/* Manuel Banka Bakiyesi Eşitleme */}
               <div>
-                <label className={`text-xs font-semibold block mb-1 ${
-                  isDark ? 'text-neutral-300' : 'text-neutral-700'
-                }`}>
-                  Mevcut Kalan Nakit (20 Kasım'a Kadar) (₺)
-                </label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={currentBalance}
-                  onChange={(e) => setCurrentBalance(e.target.value.replace(/\D/g, ''))}
-                  className={`w-full px-3.5 py-2.5 rounded-xl text-sm font-bold num-tabular outline-none ${
-                    isDark
-                      ? 'bg-neutral-900 border border-neutral-700 text-white focus:border-cyan-500'
-                      : 'bg-white border border-neutral-300 text-neutral-900 focus:border-cyan-600'
-                  }`}
-                />
-                <span className={`text-[10px] block mt-1 ${isDark ? 'text-neutral-500' : 'text-neutral-400'}`}>
-                  20 Kasım'a kadar günlük harcaman bu bakiye üzerinden hesaplanır (469 ₺/gün). 20 Kasım'da 28.000 ₺'ye sıfırlanır.
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className={`text-xs font-semibold block ${
+                    isDark ? 'text-neutral-300' : 'text-neutral-700'
+                  }`}>
+                    Bankadaki Güncel Bakiye / Kalan Nakit (₺)
+                  </label>
+                  {isSynced && (
+                    <span className="text-[10px] font-bold text-emerald-500 flex items-center gap-1">
+                      <Check className="w-3 h-3 stroke-[2.5]" /> Eşitlendi
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={currentBalance}
+                    onChange={(e) => {
+                      setCurrentBalance(e.target.value.replace(/\D/g, ''));
+                      setIsSynced(false);
+                    }}
+                    placeholder="Örn: 7500"
+                    className={`flex-1 px-3.5 py-2.5 rounded-xl text-sm font-bold num-tabular outline-none ${
+                      isDark
+                        ? 'bg-neutral-900 border border-neutral-700 text-white focus:border-cyan-500'
+                        : 'bg-white border border-neutral-300 text-neutral-900 focus:border-cyan-600'
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSyncBankBalance}
+                    className="px-3.5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-600 active:scale-95 text-black font-bold text-xs shrink-0 transition-all flex items-center gap-1"
+                  >
+                    <span>Eşitle</span>
+                  </button>
+                </div>
+
+                <span className={`text-[10px] block mt-1.5 leading-relaxed ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
+                  Bankanızdaki net parayla sistem farklıysa veya hesaba ekstra para girdiyse bakiyeyi güncelleyin. <strong>Harcamalarınız silinmez</strong>; günlük hakkınız ve kalan nakitiniz anında güncellenir.
                 </span>
               </div>
 
