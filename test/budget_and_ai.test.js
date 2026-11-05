@@ -34,24 +34,24 @@ describe('Budget Financial Engine & Date Calculations', () => {
     assert.equal(cycle.totalDays, 30);
   });
 
-  test('Calculates daily allowance correctly (28.000 TL / cycle days)', () => {
-    // 31 day cycle: 28000 / 31 = 903.2258...
+  test('Calculates daily allowance correctly on cycle start (28.000 TL / cycle days)', () => {
+    // 31 day cycle start (Oct 20): 28000 / 31 = 903.2258...
     const metrics31 = computeBudgetMetrics({
       expenses: [],
       monthlyIncome: 28000,
       salaryDay: 20,
-      targetDate: new Date(2026, 10, 4, 12, 0)
+      targetDate: new Date(2026, 9, 20, 12, 0)
     });
     assert.equal(Math.round(metrics31.dailyAllowance), 903);
     assert.equal(metrics31.todayNet, metrics31.dailyAllowance);
     assert.equal(metrics31.isTodaySurplus, true);
 
-    // 30 day cycle: 28000 / 30 = 933.33...
+    // 30 day cycle start (Nov 20): 28000 / 30 = 933.33...
     const metrics30 = computeBudgetMetrics({
       expenses: [],
       monthlyIncome: 28000,
       salaryDay: 20,
-      targetDate: new Date(2026, 10, 22, 12, 0)
+      targetDate: new Date(2026, 10, 20, 12, 0)
     });
     assert.equal(Math.round(metrics30.dailyAllowance), 933);
   });
@@ -91,6 +91,77 @@ describe('Budget Financial Engine & Date Calculations', () => {
     assert.equal(Math.round(metrics.dailyAllowance), 933);
   });
 
+  test('Dynamic daily rebalancing: spending on Day 1 updates Day 2 daily allowance', () => {
+    // Day 1: Nov 4. User has 7500 TL with 16 days remaining.
+    // Daily allowance = 7500 / 16 = 468.75 TL.
+    // User spends 1000 TL on Nov 4.
+    const expenses = [
+      { id: 1, title: 'Alışveriş', amount: 1000, category: 'Alışveriş', date: '2026-11-04', timestamp: new Date(2026, 10, 4, 14, 0).getTime() }
+    ];
+
+    // During Nov 4:
+    const metricsDay1 = computeBudgetMetrics({
+      expenses,
+      monthlyIncome: 28000,
+      salaryDay: 20,
+      currentBalance: 7500,
+      balanceSetDate: '2026-11-04',
+      targetDate: new Date(2026, 10, 4, 18, 0), // 4 Nov evening
+      resetHour: 6
+    });
+
+    // On Day 1: daily allowance is FIXED at 468.75 TL; spending 1000 TL puts today at -531.25 TL
+    assert.equal(metricsDay1.dailyAllowance, 468.75);
+    assert.equal(metricsDay1.todayTotalSpent, 1000);
+    assert.equal(metricsDay1.todayNet, 468.75 - 1000);
+    assert.equal(metricsDay1.isTodaySurplus, false);
+    assert.equal(metricsDay1.cycleRemaining, 6500);
+
+    // Day 2 arrives: Nov 5 at 07:00 AM.
+    // Days remaining = 15 (Nov 5 to Nov 19 inclusive).
+    // Remaining money at start of Nov 5 = 7500 - 1000 = 6500 TL.
+    // New rebalanced daily allowance = 6500 / 15 = 433.333... TL!
+    const metricsDay2 = computeBudgetMetrics({
+      expenses,
+      monthlyIncome: 28000,
+      salaryDay: 20,
+      currentBalance: 7500,
+      balanceSetDate: '2026-11-04',
+      targetDate: new Date(2026, 10, 5, 7, 0), // 5 Nov morning
+      resetHour: 6
+    });
+
+    assert.equal(metricsDay2.daysLeftInPeriod, 15);
+    assert.equal(metricsDay2.remainingAtStartOfToday, 6500);
+    assert.equal(Math.round(metricsDay2.dailyAllowance * 100) / 100, 433.33);
+    assert.equal(metricsDay2.todayTotalSpent, 0); // No expenses yet on Nov 5
+    assert.equal(Math.round(metricsDay2.todayNet * 100) / 100, 433.33);
+    assert.equal(metricsDay2.isTodaySurplus, true);
+    assert.equal(metricsDay2.cycleRemaining, 6500);
+  });
+
+  test('Dynamic daily rebalancing: saving on Day 1 increases Day 2 daily allowance', () => {
+    // Day 1: Nov 4. User spends only 100 TL out of 468.75 TL allowance.
+    const expenses = [
+      { id: 1, title: 'Kahve', amount: 100, category: 'Kahve & Kafe', date: '2026-11-04', timestamp: new Date(2026, 10, 4, 10, 0).getTime() }
+    ];
+
+    // Day 2 arrives: Nov 5. Remaining = 7500 - 100 = 7400 TL.
+    // Days remaining = 15. New allowance = 7400 / 15 = 493.33 TL (increased from 468.75 TL!)
+    const metricsDay2 = computeBudgetMetrics({
+      expenses,
+      monthlyIncome: 28000,
+      salaryDay: 20,
+      currentBalance: 7500,
+      balanceSetDate: '2026-11-04',
+      targetDate: new Date(2026, 10, 5, 8, 0),
+      resetHour: 6
+    });
+
+    assert.equal(metricsDay2.remainingAtStartOfToday, 7400);
+    assert.equal(Math.round(metricsDay2.dailyAllowance * 100) / 100, 493.33);
+  });
+
   test('Computes today net balance (+ when under allowance, - when overspent)', () => {
     const today = new Date();
     const todayStr = getTodayString(today);
@@ -114,7 +185,7 @@ describe('Budget Financial Engine & Date Calculations', () => {
 
     // Case 2: Overspent
     const expensesOver = [
-      { id: 1, title: 'Alışveriş', amount: 1500, category: 'Alışveriş', date: todayStr, timestamp: today.getTime() }
+      { id: 1, title: 'Alışveriş', amount: 3000, category: 'Alışveriş', date: todayStr, timestamp: today.getTime() }
     ];
 
     const metricsOver = computeBudgetMetrics({
@@ -124,7 +195,7 @@ describe('Budget Financial Engine & Date Calculations', () => {
       targetDate: today
     });
 
-    assert.equal(metricsOver.todayTotalSpent, 1500);
+    assert.equal(metricsOver.todayTotalSpent, 3000);
     assert.ok(metricsOver.todayNet < 0);
     assert.equal(metricsOver.isTodaySurplus, false);
   });

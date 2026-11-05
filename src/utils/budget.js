@@ -106,17 +106,37 @@ export function computeBudgetMetrics({
 
   const todayStr = getTodayString(targetDate, resetHour);
 
+  const balanceSetDateObj = balanceSetDate ? new Date(balanceSetDate + 'T00:00:00') : null;
+  const balanceSetTs = balanceSetDateObj ? balanceSetDateObj.getTime() : 0;
+
+  // Determine if mid-cycle balance override is active:
+  const isBalanceActive = Boolean(
+    currentBalance > 0 &&
+    balanceSetDateObj &&
+    balanceSetDateObj >= cycle.startDate &&
+    logicalDate >= balanceSetDateObj &&
+    logicalDate <= cycle.endDate
+  );
+
+  // Relevant starting budget & reference date
+  const effectiveStartingBudget = isBalanceActive ? currentBalance : monthlyIncome;
+  const effectiveStartDateStr = isBalanceActive ? balanceSetDate : getTodayString(cycle.startDate, 0);
+
+  // Days left from today (inclusive) until next salary day
+  const todayMidnight = new Date(logicalDate.getFullYear(), logicalDate.getMonth(), logicalDate.getDate(), 0, 0, 0, 0);
+  const nextSalaryMidnight = new Date(cycle.endDate.getFullYear(), cycle.endDate.getMonth(), cycle.endDate.getDate() + 1, 0, 0, 0, 0);
+  const daysLeftInPeriod = Math.max(1, Math.round((nextSalaryMidnight.getTime() - todayMidnight.getTime()) / (1000 * 60 * 60 * 24)));
+
   let cycleTotalSpent = 0;
   let todayTotalSpent = 0;
   let periodSpentSinceBalanceSet = 0;
+  let pastExpensesBeforeToday = 0;
   const categoryTotals = {};
-
-  const balanceSetDateObj = balanceSetDate ? new Date(balanceSetDate + 'T00:00:00') : null;
-  const balanceSetTs = balanceSetDateObj ? balanceSetDateObj.getTime() : 0;
 
   for (const exp of expenses) {
     const expTs = exp.timestamp || new Date(exp.date).getTime();
     const amount = Number(exp.amount) || 0;
+    const expDateStr = exp.date || getTodayString(new Date(expTs), resetHour);
 
     // Check if within current salary cycle
     if (expTs >= cycleStartTs && expTs <= cycleEndTs) {
@@ -136,44 +156,35 @@ export function computeBudgetMetrics({
       }
     }
 
+    // Past expenses in the active cycle made before today
+    if (expDateStr >= effectiveStartDateStr && expDateStr < todayStr && expTs <= cycleEndTs) {
+      pastExpensesBeforeToday += amount;
+    }
+
     // Check if spent today (based on logical date)
-    if (exp.date === todayStr) {
+    if (expDateStr === todayStr) {
       todayTotalSpent += amount;
     }
   }
 
-  // Determine if mid-cycle balance override is active:
-  const isBalanceActive = Boolean(
-    currentBalance > 0 &&
-    balanceSetDateObj &&
-    balanceSetDateObj >= cycle.startDate &&
-    logicalDate >= balanceSetDateObj &&
-    logicalDate <= cycle.endDate
-  );
+  // 1. Money remaining at the START of today (before today's expenses)
+  const remainingAtStartOfToday = Math.max(0, effectiveStartingBudget - pastExpensesBeforeToday);
 
-  let dailyAllowance = 0;
-  let cycleRemaining = 0;
-  let cyclePercentSpent = 0;
-  let daysLeftInPeriod = 0;
+  // 2. Dynamic daily allowance:
+  // Calculated at start of day: total remaining divided by remaining days
+  // Stays FIXED during today so today's expenses are deducted from it!
+  const dailyAllowance = daysLeftInPeriod > 0 ? (remainingAtStartOfToday / daysLeftInPeriod) : 0;
 
-  if (isBalanceActive) {
-    const todayMidnight = new Date(logicalDate.getFullYear(), logicalDate.getMonth(), logicalDate.getDate(), 0, 0, 0, 0);
-    const nextSalaryMidnight = new Date(cycle.endDate.getFullYear(), cycle.endDate.getMonth(), cycle.endDate.getDate() + 1, 0, 0, 0, 0);
-    daysLeftInPeriod = Math.max(1, Math.round((nextSalaryMidnight.getTime() - todayMidnight.getTime()) / (1000 * 60 * 60 * 24)));
-
-    dailyAllowance = currentBalance / daysLeftInPeriod;
-    cycleRemaining = Math.max(0, currentBalance - periodSpentSinceBalanceSet);
-    cyclePercentSpent = currentBalance > 0 ? Math.min(100, Math.max(0, (periodSpentSinceBalanceSet / currentBalance) * 100)) : 0;
-  } else {
-    daysLeftInPeriod = cycle.remainingDays;
-    dailyAllowance = cycle.totalDays > 0 ? (monthlyIncome / cycle.totalDays) : 0;
-    cycleRemaining = Math.max(0, monthlyIncome - cycleTotalSpent);
-    cyclePercentSpent = monthlyIncome > 0 ? Math.min(100, Math.max(0, (cycleTotalSpent / monthlyIncome) * 100)) : 0;
-  }
-
-  // Today's Balance (+ is positive/karda, - is overspent/aşma)
+  // 3. Today's net status (+ is under budget/karda, - is over budget/aşma)
   const todayNet = dailyAllowance - todayTotalSpent;
   const isTodaySurplus = todayNet >= 0;
+
+  // 4. Overall remaining budget across the period
+  const totalSpentInPeriod = pastExpensesBeforeToday + todayTotalSpent;
+  const cycleRemaining = Math.max(0, effectiveStartingBudget - totalSpentInPeriod);
+  const cyclePercentSpent = effectiveStartingBudget > 0
+    ? Math.min(100, Math.max(0, (totalSpentInPeriod / effectiveStartingBudget) * 100))
+    : 0;
 
   // Average spent per day elapsed in cycle
   const avgDailySpent = cycle.elapsedDays > 0 ? (cycleTotalSpent / cycle.elapsedDays) : 0;
@@ -187,6 +198,7 @@ export function computeBudgetMetrics({
     daysLeftInPeriod,
     monthlyIncome: isBalanceActive ? currentBalance : monthlyIncome,
     baseIncome: monthlyIncome,
+    remainingAtStartOfToday,
     dailyAllowance,
     todayTotalSpent,
     todayNet,
@@ -203,11 +215,15 @@ export function computeBudgetMetrics({
 
 /**
  * Computes daily spending history for the calendar modal.
- * Groups expenses by logical date for past days in the cycle.
+ * Dynamically computes the historical daily allowance for each past day.
  */
 export function computeDailyHistory({
   expenses = [],
   dailyAllowance = 0,
+  monthlyIncome = null,
+  salaryDay = null,
+  currentBalance = 0,
+  balanceSetDate = null,
   targetDate = new Date(),
   resetHour = 6,
   daysCount = 14
@@ -236,9 +252,40 @@ export function computeDailyHistory({
     const day = String(d.getDate()).padStart(2, '0');
     const dateStr = `${year}-${month}-${day}`;
 
+    // Dynamic historical allowance for this specific day
+    let dayAllowance = dailyAllowance;
+
+    if (salaryDay && (currentBalance > 0 || (monthlyIncome !== null && monthlyIncome > 0))) {
+      const cycleOnDay = getSalaryCycle(salaryDay, d, resetHour);
+      const isBalanceActiveOnDay = Boolean(
+        currentBalance > 0 &&
+        balanceSetDate &&
+        dateStr >= balanceSetDate &&
+        d <= cycleOnDay.endDate
+      );
+
+      const effectiveBudget = isBalanceActiveOnDay ? currentBalance : monthlyIncome;
+      const effectiveStartStr = isBalanceActiveOnDay ? balanceSetDate : getTodayString(cycleOnDay.startDate, 0);
+
+      const dMidnight = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+      const nextSalaryMidnight = new Date(cycleOnDay.endDate.getFullYear(), cycleOnDay.endDate.getMonth(), cycleOnDay.endDate.getDate() + 1, 0, 0, 0, 0);
+      const daysLeftOnDay = Math.max(1, Math.round((nextSalaryMidnight.getTime() - dMidnight.getTime()) / (1000 * 60 * 60 * 24)));
+
+      let pastExpBeforeDay = 0;
+      for (const exp of expenses) {
+        const expDate = exp.date;
+        if (expDate && expDate >= effectiveStartStr && expDate < dateStr) {
+          pastExpBeforeDay += (Number(exp.amount) || 0);
+        }
+      }
+
+      const remainingStartOfDay = Math.max(0, effectiveBudget - pastExpBeforeDay);
+      dayAllowance = daysLeftOnDay > 0 ? (remainingStartOfDay / daysLeftOnDay) : 0;
+    }
+
     const dayItems = expensesByDate[dateStr] || [];
     const totalSpent = dayItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
-    const net = dailyAllowance - totalSpent;
+    const net = dayAllowance - totalSpent;
     const isSurplus = net >= 0;
 
     let relativeLabel = '';
@@ -260,7 +307,7 @@ export function computeDailyHistory({
       relativeLabel,
       fullDateLabel,
       totalSpent,
-      dailyAllowance,
+      dailyAllowance: dayAllowance,
       net,
       isSurplus,
       items: dayItems,

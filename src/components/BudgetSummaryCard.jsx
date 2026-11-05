@@ -32,7 +32,7 @@ export default function BudgetSummaryCard({ metrics, isDark }) {
             : 'bg-cyan-50 text-cyan-800 border border-cyan-200'
         }`}>
           <Sparkles className="w-3.5 h-3.5 shrink-0" />
-          <span>20 Kasım'a kadar 7.500 ₺ bütçe devrede ({daysLeftInPeriod} gün)</span>
+          <span>20 Kasım'a kadar {formatCurrency(metrics.monthlyIncome, true)} bütçe devrede ({daysLeftInPeriod} gün)</span>
         </div>
       )}
 

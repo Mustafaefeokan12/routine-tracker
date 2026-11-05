@@ -123,11 +123,22 @@ export default function App() {
     return computeDailyHistory({
       expenses,
       dailyAllowance: metrics.dailyAllowance,
+      monthlyIncome: settings.monthlyIncome,
+      salaryDay: settings.salaryDay,
+      currentBalance: settings.currentBalance,
+      balanceSetDate: settings.balanceSetDate,
       targetDate: new Date(),
       resetHour: 6,
       daysCount: 16
     });
-  }, [expenses, metrics.dailyAllowance]);
+  }, [
+    expenses,
+    metrics.dailyAllowance,
+    settings.monthlyIncome,
+    settings.salaryDay,
+    settings.currentBalance,
+    settings.balanceSetDate
+  ]);
 
   // 1. Add IQOS Quick Expense
   const handleAddIqos = async () => {
