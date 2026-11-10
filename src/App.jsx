@@ -114,6 +114,7 @@ export default function App() {
       currentBalance: settings.currentBalance,
       balanceSetDate: settings.balanceSetDate,
       balanceSetTimestamp: settings.balanceSetTimestamp,
+      balanceCheckpoints: settings.balanceCheckpoints,
       resetHour: 6,
       targetDate: new Date()
     });
@@ -123,7 +124,8 @@ export default function App() {
     settings.salaryDay,
     settings.currentBalance,
     settings.balanceSetDate,
-    settings.balanceSetTimestamp
+    settings.balanceSetTimestamp,
+    settings.balanceCheckpoints
   ]);
 
   // Daily Spending History for Calendar Modal
@@ -135,6 +137,7 @@ export default function App() {
       salaryDay: settings.salaryDay,
       currentBalance: settings.currentBalance,
       balanceSetDate: settings.balanceSetDate,
+      balanceCheckpoints: settings.balanceCheckpoints,
       targetDate: new Date(),
       resetHour: 6,
       daysCount: 30,
@@ -146,7 +149,8 @@ export default function App() {
     settings.monthlyIncome,
     settings.salaryDay,
     settings.currentBalance,
-    settings.balanceSetDate
+    settings.balanceSetDate,
+    settings.balanceCheckpoints
   ]);
 
   // 1. Add IQOS Quick Expense

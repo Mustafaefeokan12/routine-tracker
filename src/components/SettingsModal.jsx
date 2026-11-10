@@ -23,6 +23,22 @@ export default function SettingsModal({
 
   if (!isOpen) return null;
 
+  const updateCheckpointsList = (newVal, todayStr, now) => {
+    const existing = Array.isArray(settings.balanceCheckpoints) && settings.balanceCheckpoints.length > 0
+      ? [...settings.balanceCheckpoints]
+      : [{ date: '2026-11-04', balance: 7500 }];
+
+    const updated = [...existing];
+    const idx = updated.findIndex((cp) => cp.date === todayStr);
+    if (idx >= 0) {
+      updated[idx] = { date: todayStr, balance: newVal, timestamp: now };
+    } else {
+      updated.push({ date: todayStr, balance: newVal, timestamp: now });
+    }
+    updated.sort((a, b) => a.date.localeCompare(b.date));
+    return updated;
+  };
+
   const handleSyncBankBalance = () => {
     const val = Number(currentBalance);
     if (isNaN(val)) return;
@@ -30,9 +46,12 @@ export default function SettingsModal({
     soundEngine.playSuccess();
     const todayStr = getTodayString(new Date(), 6);
     const now = Date.now();
+    const updatedCps = updateCheckpointsList(val, todayStr, now);
+
     onUpdateSetting('currentBalance', val);
     onUpdateSetting('balanceSetDate', todayStr);
     onUpdateSetting('balanceSetTimestamp', now);
+    onUpdateSetting('balanceCheckpoints', updatedCps);
     setIsSynced(true);
     setTimeout(() => setIsSynced(false), 3000);
   };
@@ -50,8 +69,10 @@ export default function SettingsModal({
     onUpdateSetting('iqosPrice', Number(iqosPrice) || 220);
     onUpdateSetting('currentBalance', newBalance);
     if (isBalanceChanged) {
+      const updatedCps = updateCheckpointsList(newBalance, todayStr, now);
       onUpdateSetting('balanceSetDate', todayStr);
       onUpdateSetting('balanceSetTimestamp', now);
+      onUpdateSetting('balanceCheckpoints', updatedCps);
     }
     onClose();
   };

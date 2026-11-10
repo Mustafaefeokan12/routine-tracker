@@ -213,6 +213,69 @@ describe('Budget Financial Engine & Date Calculations', () => {
     assert.equal(updatedExpenses.length, 3);
   });
 
+  test('Updating balance on Nov 10 preserves accurate historical days in calendar (prevents +1000 TL bug)', () => {
+    const expenses = [
+      { id: 1, title: 'IQOS', amount: 220, category: 'Tütün / IQOS', date: '2026-11-04', timestamp: new Date(2026, 10, 4, 12, 0).getTime() },
+      { id: 2, title: 'Yemek', amount: 150, category: 'Yemek & Restoran', date: '2026-11-05', timestamp: new Date(2026, 10, 5, 13, 0).getTime() }
+    ];
+
+    // Checkpoints representing user setting 7500 on Nov 4, and now updating to 5000 on Nov 10:
+    const balanceCheckpoints = [
+      { date: '2026-11-04', balance: 7500 },
+      { date: '2026-11-10', balance: 5000 }
+    ];
+
+    const history = computeDailyHistory({
+      expenses,
+      salaryDay: 20,
+      currentBalance: 5000,
+      balanceSetDate: '2026-11-10',
+      balanceCheckpoints,
+      targetDate: new Date(2026, 10, 10, 12, 0),
+      resetHour: 6,
+      daysCount: 7,
+      minDate: '2026-11-04'
+    });
+
+    // Find Nov 4 & Nov 5 entries in history:
+    const dayNov4 = history.find(h => h.dateStr === '2026-11-04');
+    const dayNov5 = history.find(h => h.dateStr === '2026-11-05');
+    const dayNov10 = history.find(h => h.dateStr === '2026-11-10');
+
+    assert.ok(dayNov4);
+    assert.ok(dayNov5);
+    assert.ok(dayNov10);
+
+    // Nov 4 daily allowance must be 468.75 TL, NOT 1750 TL!
+    assert.equal(dayNov4.dailyAllowance, 468.75);
+    assert.equal(dayNov4.totalSpent, 220);
+    assert.equal(dayNov4.net, 468.75 - 220); // +248.75 TL
+
+    // Nov 5 daily allowance must be ~485.33 TL, NOT 1866 TL!
+    assert.equal(Math.round(dayNov5.dailyAllowance * 100) / 100, 485.33);
+    assert.equal(dayNov5.totalSpent, 150);
+    assert.equal(Math.round(dayNov5.net * 100) / 100, 335.33);
+
+    // Nov 10 daily allowance must be 500 TL (5000 / 10 days)
+    assert.equal(dayNov10.dailyAllowance, 500);
+
+    // Also verify computeBudgetMetrics reports the TRUE total spent (not 0):
+    const metrics = computeBudgetMetrics({
+      expenses,
+      monthlyIncome: 28000,
+      salaryDay: 20,
+      currentBalance: 5000,
+      balanceSetDate: '2026-11-10',
+      balanceCheckpoints,
+      targetDate: new Date(2026, 10, 10, 12, 0),
+      resetHour: 6
+    });
+
+    assert.equal(metrics.cycleTotalSpent, 370); // 220 + 150 = 370 TL (accurate total!)
+    assert.equal(metrics.dailyAllowance, 500);
+    assert.equal(metrics.cycleRemaining, 5000);
+  });
+
   test('Calendar history minDate excludes all days prior to Nov 4', () => {
     const expenses = [
       { id: 1, title: 'IQOS', amount: 220, category: 'Tütün / IQOS', date: '2026-11-04', timestamp: Date.now() }

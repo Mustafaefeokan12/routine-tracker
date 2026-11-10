@@ -15,6 +15,9 @@ export const DEFAULT_SETTINGS = {
   currentBalance: 7500, // 4 Kasım itibarıyla hesapta kalan nakit
   balanceSetDate: '2026-11-04',
   balanceSetTimestamp: null,
+  balanceCheckpoints: [
+    { date: '2026-11-04', balance: 7500 }
+  ],
   theme: 'dark', // 'dark' | 'light' | 'system'
   dailyNotification: false,
   notificationTime: '22:00'

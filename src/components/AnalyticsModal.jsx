@@ -5,6 +5,7 @@ import { triggerHaptic } from '../utils/haptics';
 
 export default function AnalyticsModal({ isOpen, onClose, metrics, isDark, expenses = [] }) {
   const [expandedCategory, setExpandedCategory] = useState(null);
+  const [showAllTimeTotal, setShowAllTimeTotal] = useState(false);
 
   if (!isOpen) return null;
 
@@ -18,9 +19,18 @@ export default function AnalyticsModal({ isOpen, onClose, metrics, isDark, expen
     cycle
   } = metrics;
 
+  const allTimeTotal = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+  const currentTotal = cycleTotalSpent > 0 ? cycleTotalSpent : allTimeTotal;
+  const activeDisplayTotal = showAllTimeTotal ? allTimeTotal : currentTotal;
+
   const toggleCategory = (catName) => {
     triggerHaptic('selection');
     setExpandedCategory((prev) => (prev === catName ? null : catName));
+  };
+
+  const toggleTotalView = () => {
+    triggerHaptic('light');
+    setShowAllTimeTotal((prev) => !prev);
   };
 
   const getCategoryExpenses = (catName) => {
@@ -75,18 +85,32 @@ export default function AnalyticsModal({ isOpen, onClose, metrics, isDark, expen
 
         {/* Quick Stats Grid */}
         <div className="grid grid-cols-2 gap-2.5 mb-5">
-          <div className={`p-3.5 rounded-2xl border ${
-            isDark ? 'bg-neutral-800/50 border-neutral-800' : 'bg-neutral-50 border-neutral-200/80'
-          }`}>
-            <span className={`text-[11px] font-semibold uppercase tracking-wider block ${
-              isDark ? 'text-neutral-400' : 'text-neutral-500'
-            }`}>
-              Toplam Harcanan
-            </span>
+          <button
+            type="button"
+            onClick={toggleTotalView}
+            className={`p-3.5 rounded-2xl border text-left spring-tap cursor-pointer transition-all ${
+              isDark ? 'bg-neutral-800/50 border-neutral-800 hover:border-neutral-700' : 'bg-neutral-50 border-neutral-200/80 hover:border-neutral-300'
+            }`}
+            title="Dönem / Genel Toplam Değiştir"
+          >
+            <div className="flex items-center justify-between">
+              <span className={`text-[11px] font-semibold uppercase tracking-wider block ${
+                isDark ? 'text-neutral-400' : 'text-neutral-500'
+              }`}>
+                Toplam Harcanan
+              </span>
+              <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
+                showAllTimeTotal
+                  ? 'bg-purple-500/20 text-purple-400'
+                  : isDark ? 'bg-neutral-700 text-neutral-300' : 'bg-neutral-200 text-neutral-700'
+              }`}>
+                {showAllTimeTotal ? 'Tümü' : 'Dönem'}
+              </span>
+            </div>
             <span className="text-xl font-extrabold num-tabular tracking-tight mt-0.5 block">
-              {formatCurrency(cycleTotalSpent, true)}
+              {formatCurrency(activeDisplayTotal, true)}
             </span>
-          </div>
+          </button>
 
           <div className={`p-3.5 rounded-2xl border ${
             isDark ? 'bg-neutral-800/50 border-neutral-800' : 'bg-neutral-50 border-neutral-200/80'

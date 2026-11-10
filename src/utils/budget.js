@@ -90,6 +90,28 @@ export function getSalaryCycle(salaryDay = 20, targetDate = new Date(), resetHou
  * Computes all financial metrics for the active cycle and today.
  * Supports mid-cycle balance override (e.g. 7.500 TL remaining until Nov 20).
  */
+/**
+ * Finds the active budget checkpoint for a given date.
+ * If multiple checkpoints exist, returns the most recent checkpoint on or before targetDateStr.
+ */
+export function getActiveCheckpoint(targetDateStr, checkpoints = [], fallbackBalance = 7500) {
+  if (!checkpoints || checkpoints.length === 0) {
+    return { date: '2026-11-04', balance: fallbackBalance };
+  }
+  const sorted = [...checkpoints].sort((a, b) => a.date.localeCompare(b.date));
+  let active = null;
+  for (const cp of sorted) {
+    if (cp.date <= targetDateStr) {
+      active = cp;
+    }
+  }
+  return active || sorted[0];
+}
+
+/**
+ * Computes all financial metrics for the active cycle and today.
+ * Supports mid-cycle balance override and multiple balance checkpoints.
+ */
 export function computeBudgetMetrics({
   expenses = [],
   monthlyIncome = 28000,
@@ -97,6 +119,7 @@ export function computeBudgetMetrics({
   currentBalance = 0,
   balanceSetDate = null,
   balanceSetTimestamp = null,
+  balanceCheckpoints = [],
   resetHour = 6,
   targetDate = new Date()
 }) {
@@ -108,7 +131,6 @@ export function computeBudgetMetrics({
   const todayStr = getTodayString(targetDate, resetHour);
 
   const balanceSetDateObj = balanceSetDate ? new Date(balanceSetDate + 'T00:00:00') : null;
-  const balanceSetTs = balanceSetTimestamp || (balanceSetDateObj ? balanceSetDateObj.getTime() : 0);
 
   // Determine if mid-cycle balance override is active:
   const isBalanceActive = Boolean(
@@ -119,9 +141,27 @@ export function computeBudgetMetrics({
     logicalDate <= cycle.endDate
   );
 
-  // Relevant starting budget & reference date
-  const effectiveStartingBudget = isBalanceActive ? currentBalance : monthlyIncome;
-  const effectiveStartDateStr = isBalanceActive ? balanceSetDate : getTodayString(cycle.startDate, 0);
+  let effectiveStartingBudget = monthlyIncome;
+  let activeCp = null;
+
+  if (isBalanceActive) {
+    let effectiveCheckpoints = Array.isArray(balanceCheckpoints) && balanceCheckpoints.length > 0
+      ? [...balanceCheckpoints]
+      : [];
+
+    if (effectiveCheckpoints.length === 0) {
+      effectiveCheckpoints.push({ date: '2026-11-04', balance: 7500 });
+      if (balanceSetDate && balanceSetDate !== '2026-11-04') {
+        effectiveCheckpoints.push({ date: balanceSetDate, balance: currentBalance, timestamp: balanceSetTimestamp });
+      }
+    }
+
+    activeCp = getActiveCheckpoint(todayStr, effectiveCheckpoints, currentBalance || 7500);
+    effectiveStartingBudget = activeCp.balance;
+  }
+
+  const balanceSetTs = (activeCp && activeCp.timestamp) || (activeCp && activeCp.date ? new Date(activeCp.date + 'T00:00:00').getTime() : 0);
+  const effectiveStartDateStr = activeCp ? activeCp.date : getTodayString(cycle.startDate, 0);
 
   // Days left from today (inclusive) until next salary day
   const todayMidnight = new Date(logicalDate.getFullYear(), logicalDate.getMonth(), logicalDate.getDate(), 0, 0, 0, 0);
@@ -142,7 +182,7 @@ export function computeBudgetMetrics({
 
     // Check if within current salary cycle
     if (expTs >= cycleStartTs && expTs <= cycleEndTs) {
-      cycleTotalSpent += amount;
+      cycleTotalSpent += amount; // The TRUE sum of ALL expenses in this cycle!
 
       const catName = exp.category || 'Diğer';
       const catIcon = exp.categoryIcon || '📦';
@@ -159,8 +199,8 @@ export function computeBudgetMetrics({
     }
 
     // Past expenses in the active cycle made before today
-    if (isBalanceActive) {
-      if (expTs >= balanceSetTs && expDateStr < todayStr && expTs <= cycleEndTs) {
+    if (isBalanceActive && activeCp) {
+      if (expDateStr >= activeCp.date && expDateStr < todayStr && expTs <= cycleEndTs) {
         pastExpensesBeforeToday += amount;
       }
     } else {
@@ -172,7 +212,7 @@ export function computeBudgetMetrics({
     // Check if spent today (based on logical date)
     if (expDateStr === todayStr) {
       todayTotalSpent += amount;
-      if (isBalanceActive) {
+      if (isBalanceActive && activeCp && activeCp.date === todayStr && balanceSetTs > 0) {
         if (expTs >= balanceSetTs) {
           todayActiveSpent += amount;
         }
@@ -211,7 +251,7 @@ export function computeBudgetMetrics({
     cycle,
     isBalanceActive,
     daysLeftInPeriod,
-    monthlyIncome: isBalanceActive ? currentBalance : monthlyIncome,
+    monthlyIncome: isBalanceActive ? effectiveStartingBudget : monthlyIncome,
     baseIncome: monthlyIncome,
     remainingAtStartOfToday,
     dailyAllowance,
@@ -219,7 +259,8 @@ export function computeBudgetMetrics({
     todayActiveSpent,
     todayNet,
     isTodaySurplus,
-    cycleTotalSpent: isBalanceActive ? periodSpentSinceBalanceSet : cycleTotalSpent,
+    cycleTotalSpent, // Real total of all cycle expenses
+    periodSpentSinceBalanceSet,
     allCycleSpent: cycleTotalSpent,
     cycleRemaining,
     cyclePercentSpent,
@@ -231,7 +272,7 @@ export function computeBudgetMetrics({
 
 /**
  * Computes daily spending history for the calendar modal.
- * Dynamically computes the historical daily allowance for each past day.
+ * Dynamically computes the historical daily allowance for each past day based on active checkpoints.
  */
 export function computeDailyHistory({
   expenses = [],
@@ -240,6 +281,7 @@ export function computeDailyHistory({
   salaryDay = null,
   currentBalance = 0,
   balanceSetDate = null,
+  balanceCheckpoints = [],
   targetDate = new Date(),
   resetHour = 6,
   daysCount = 14,
@@ -258,6 +300,18 @@ export function computeDailyHistory({
     expensesByDate[exp.date].push(exp);
   }
 
+  // Construct effective checkpoints
+  let effectiveCheckpoints = Array.isArray(balanceCheckpoints) && balanceCheckpoints.length > 0
+    ? [...balanceCheckpoints]
+    : [];
+
+  if (effectiveCheckpoints.length === 0) {
+    effectiveCheckpoints.push({ date: '2026-11-04', balance: 7500 });
+    if (currentBalance > 0 && balanceSetDate && balanceSetDate !== '2026-11-04') {
+      effectiveCheckpoints.push({ date: balanceSetDate, balance: currentBalance });
+    }
+  }
+
   const history = [];
 
   for (let i = 0; i < daysCount; i++) {
@@ -274,20 +328,12 @@ export function computeDailyHistory({
       break;
     }
 
-    // Dynamic historical allowance for this specific day
+    // Dynamic historical allowance for this specific day based on checkpoint active on that day
     let dayAllowance = dailyAllowance;
 
     if (salaryDay && (currentBalance > 0 || (monthlyIncome !== null && monthlyIncome > 0))) {
       const cycleOnDay = getSalaryCycle(salaryDay, d, resetHour);
-      const isBalanceActiveOnDay = Boolean(
-        currentBalance > 0 &&
-        balanceSetDate &&
-        dateStr >= balanceSetDate &&
-        d <= cycleOnDay.endDate
-      );
-
-      const effectiveBudget = isBalanceActiveOnDay ? currentBalance : monthlyIncome;
-      const effectiveStartStr = isBalanceActiveOnDay ? balanceSetDate : getTodayString(cycleOnDay.startDate, 0);
+      const activeCp = getActiveCheckpoint(dateStr, effectiveCheckpoints, currentBalance || 7500);
 
       const dMidnight = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
       const nextSalaryMidnight = new Date(cycleOnDay.endDate.getFullYear(), cycleOnDay.endDate.getMonth(), cycleOnDay.endDate.getDate() + 1, 0, 0, 0, 0);
@@ -296,12 +342,12 @@ export function computeDailyHistory({
       let pastExpBeforeDay = 0;
       for (const exp of expenses) {
         const expDate = exp.date;
-        if (expDate && expDate >= effectiveStartStr && expDate < dateStr) {
+        if (expDate && expDate >= activeCp.date && expDate < dateStr) {
           pastExpBeforeDay += (Number(exp.amount) || 0);
         }
       }
 
-      const remainingStartOfDay = Math.max(0, effectiveBudget - pastExpBeforeDay);
+      const remainingStartOfDay = Math.max(0, activeCp.balance - pastExpBeforeDay);
       dayAllowance = daysLeftOnDay > 0 ? (remainingStartOfDay / daysLeftOnDay) : 0;
     }
 
