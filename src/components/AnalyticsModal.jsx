@@ -1,49 +1,102 @@
-import React, { useState } from 'react';
-import { X, PieChart, ChevronDown, ChevronUp } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { X, PieChart, ChevronDown, ChevronUp, Layers, Calendar } from 'lucide-react';
 import { formatCurrency, formatTime } from '../utils/budget';
 import { triggerHaptic } from '../utils/haptics';
 
 export default function AnalyticsModal({ isOpen, onClose, metrics, isDark, expenses = [] }) {
+  const [activeTab, setActiveTab] = useState('period'); // 'period' | 'all'
   const [expandedCategory, setExpandedCategory] = useState(null);
-  const [showAllTimeTotal, setShowAllTimeTotal] = useState(false);
+
+  const cycle = metrics?.cycle || {
+    startLabel: '',
+    endLabel: '',
+    elapsedDays: 1,
+    startDate: new Date(),
+    endDate: new Date()
+  };
+
+  const cycleStartTs = useMemo(() => {
+    return cycle.startDate instanceof Date ? cycle.startDate.getTime() : new Date(cycle.startDate).getTime();
+  }, [cycle.startDate]);
+
+  const cycleEndTs = useMemo(() => {
+    return cycle.endDate instanceof Date ? cycle.endDate.getTime() : new Date(cycle.endDate).getTime();
+  }, [cycle.endDate]);
+
+  // Filter expenses strictly according to the active tab
+  const activeExpenses = useMemo(() => {
+    if (activeTab === 'period') {
+      return expenses.filter((e) => {
+        const ts = e.timestamp || (e.date ? new Date(e.date + 'T12:00:00').getTime() : 0);
+        return ts >= cycleStartTs && ts <= cycleEndTs;
+      });
+    }
+    return [...expenses];
+  }, [expenses, activeTab, cycleStartTs, cycleEndTs]);
+
+  // Total spent in active view
+  const activeTotalSpent = useMemo(() => {
+    return activeExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+  }, [activeExpenses]);
+
+  // Group active expenses by category with 100% item-to-total parity
+  const categoryGroups = useMemo(() => {
+    const groups = {};
+    for (const exp of activeExpenses) {
+      const catName = exp.category || 'Diğer';
+      const catIcon = exp.categoryIcon || '📦';
+      const amount = Number(exp.amount) || 0;
+
+      if (!groups[catName]) {
+        groups[catName] = {
+          name: catName,
+          icon: catIcon,
+          total: 0,
+          count: 0,
+          items: []
+        };
+      }
+      groups[catName].total += amount;
+      groups[catName].count += 1;
+      groups[catName].items.push(exp);
+    }
+
+    // Sort items inside each category by date/time (newest first)
+    Object.values(groups).forEach((g) => {
+      g.items.sort((a, b) => {
+        const tsA = a.timestamp || (a.date ? new Date(a.date + 'T12:00:00').getTime() : 0);
+        const tsB = b.timestamp || (b.date ? new Date(b.date + 'T12:00:00').getTime() : 0);
+        return tsB - tsA;
+      });
+    });
+
+    // Sort categories by highest total spent
+    return Object.values(groups).sort((a, b) => b.total - a.total);
+  }, [activeExpenses]);
+
+  // Average daily spent
+  const avgDailySpent = useMemo(() => {
+    if (activeTab === 'period') {
+      const days = Math.max(1, cycle.elapsedDays || 1);
+      return activeTotalSpent / days;
+    }
+    // All-time: unique days with expenses or 1
+    const uniqueDates = new Set(expenses.map((e) => e.date).filter(Boolean));
+    const dayCount = Math.max(1, uniqueDates.size);
+    return activeTotalSpent / dayCount;
+  }, [activeTab, activeTotalSpent, cycle.elapsedDays, expenses]);
 
   if (!isOpen) return null;
-
-  const {
-    monthlyIncome,
-    cycleTotalSpent,
-    cycleRemaining,
-    cyclePercentSpent,
-    avgDailySpent,
-    categories = [],
-    cycle
-  } = metrics;
-
-  const allTimeTotal = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-  const currentTotal = cycleTotalSpent > 0 ? cycleTotalSpent : allTimeTotal;
-  const activeDisplayTotal = showAllTimeTotal ? allTimeTotal : currentTotal;
 
   const toggleCategory = (catName) => {
     triggerHaptic('selection');
     setExpandedCategory((prev) => (prev === catName ? null : catName));
   };
 
-  const toggleTotalView = () => {
+  const handleTabChange = (tab) => {
     triggerHaptic('light');
-    setShowAllTimeTotal((prev) => !prev);
-  };
-
-  const getCategoryExpenses = (catName) => {
-    const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
-    return expenses.filter((exp) => {
-      const expTs = exp.timestamp || new Date(exp.date + 'T12:00:00').getTime();
-      const matchesCategory = (exp.category === catName) || (!exp.category && catName === 'Diğer');
-      return matchesCategory && expTs >= thirtyDaysAgo;
-    }).sort((a, b) => {
-      const tsA = a.timestamp || new Date(a.date + 'T12:00:00').getTime();
-      const tsB = b.timestamp || new Date(b.date + 'T12:00:00').getTime();
-      return tsB - tsA;
-    });
+    setActiveTab(tab);
+    setExpandedCategory(null);
   };
 
   return (
@@ -59,7 +112,7 @@ export default function AnalyticsModal({ isOpen, onClose, metrics, isDark, expen
         }`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-xl bg-purple-500/10 text-purple-500">
               <PieChart className="w-5 h-5 stroke-[2.2]" />
@@ -67,7 +120,9 @@ export default function AnalyticsModal({ isOpen, onClose, metrics, isDark, expen
             <div>
               <h2 className="text-lg font-bold tracking-tight">Kategori Dağılımı</h2>
               <p className={`text-xs ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
-                {cycle.startLabel} – {cycle.endLabel} Dönemi
+                {activeTab === 'period'
+                  ? `${cycle.startLabel} – ${cycle.endLabel} Dönemi`
+                  : 'Tüm Zamanlar (Genel Toplam)'}
               </p>
             </div>
           </div>
@@ -83,15 +138,54 @@ export default function AnalyticsModal({ isOpen, onClose, metrics, isDark, expen
           </button>
         </div>
 
+        {/* Segmented Control Toggle: Dönem (Bu Ay) vs Tüm Zamanlar */}
+        <div className={`p-1 rounded-2xl flex items-center gap-1 mb-4 border ${
+          isDark ? 'bg-neutral-800/80 border-neutral-700/60' : 'bg-neutral-100 border-neutral-200'
+        }`}>
+          <button
+            type="button"
+            onClick={() => handleTabChange('period')}
+            className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all spring-tap flex items-center justify-center gap-1.5 ${
+              activeTab === 'period'
+                ? isDark
+                  ? 'bg-purple-600 text-white shadow-md'
+                  : 'bg-white text-purple-700 shadow-sm'
+                : isDark
+                  ? 'text-neutral-400 hover:text-neutral-200'
+                  : 'text-neutral-600 hover:text-neutral-900'
+            }`}
+          >
+            <Calendar className="w-3.5 h-3.5 stroke-[2.2]" />
+            <span>Bu Ay (Dönem)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleTabChange('all')}
+            className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all spring-tap flex items-center justify-center gap-1.5 ${
+              activeTab === 'all'
+                ? isDark
+                  ? 'bg-purple-600 text-white shadow-md'
+                  : 'bg-white text-purple-700 shadow-sm'
+                : isDark
+                  ? 'text-neutral-400 hover:text-neutral-200'
+                  : 'text-neutral-600 hover:text-neutral-900'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5 stroke-[2.2]" />
+            <span>Tüm Zamanlar</span>
+          </button>
+        </div>
+
         {/* Quick Stats Grid */}
         <div className="grid grid-cols-2 gap-2.5 mb-5">
           <button
             type="button"
-            onClick={toggleTotalView}
+            onClick={() => handleTabChange(activeTab === 'period' ? 'all' : 'period')}
             className={`p-3.5 rounded-2xl border text-left spring-tap cursor-pointer transition-all ${
               isDark ? 'bg-neutral-800/50 border-neutral-800 hover:border-neutral-700' : 'bg-neutral-50 border-neutral-200/80 hover:border-neutral-300'
             }`}
-            title="Dönem / Genel Toplam Değiştir"
+            title="Dönem / Genel Görünüm Değiştir"
           >
             <div className="flex items-center justify-between">
               <span className={`text-[11px] font-semibold uppercase tracking-wider block ${
@@ -100,15 +194,15 @@ export default function AnalyticsModal({ isOpen, onClose, metrics, isDark, expen
                 Toplam Harcanan
               </span>
               <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
-                showAllTimeTotal
+                activeTab === 'all'
                   ? 'bg-purple-500/20 text-purple-400'
                   : isDark ? 'bg-neutral-700 text-neutral-300' : 'bg-neutral-200 text-neutral-700'
               }`}>
-                {showAllTimeTotal ? 'Tümü' : 'Dönem'}
+                {activeTab === 'all' ? 'Tümü' : 'Dönem'}
               </span>
             </div>
             <span className="text-xl font-extrabold num-tabular tracking-tight mt-0.5 block">
-              {formatCurrency(activeDisplayTotal, true)}
+              {formatCurrency(activeTotalSpent, true)}
             </span>
           </button>
 
@@ -128,22 +222,28 @@ export default function AnalyticsModal({ isOpen, onClose, metrics, isDark, expen
 
         {/* Category Breakdown List */}
         <div className="space-y-3">
-          <h3 className={`text-xs font-bold uppercase tracking-wider px-1 ${
-            isDark ? 'text-neutral-400' : 'text-neutral-500'
-          }`}>
-            Harcama Kalemleri
-          </h3>
+          <div className="flex items-center justify-between px-1">
+            <h3 className={`text-xs font-bold uppercase tracking-wider ${
+              isDark ? 'text-neutral-400' : 'text-neutral-500'
+            }`}>
+              Harcama Kalemleri
+            </h3>
+            <span className={`text-xs num-tabular ${isDark ? 'text-neutral-500' : 'text-neutral-400'}`}>
+              {categoryGroups.length} Kategori
+            </span>
+          </div>
 
-          {categories.length === 0 ? (
-            <p className={`text-xs text-center py-6 ${isDark ? 'text-neutral-500' : 'text-neutral-400'}`}>
-              Bu dönemde henüz kategori kaydı bulunmuyor.
+          {categoryGroups.length === 0 ? (
+            <p className={`text-xs text-center py-8 ${isDark ? 'text-neutral-500' : 'text-neutral-400'}`}>
+              {activeTab === 'period'
+                ? 'Bu dönemde henüz harcama kaydı bulunmuyor.'
+                : 'Henüz kayıtlı harcama bulunmuyor.'}
             </p>
           ) : (
             <div className="space-y-2.5">
-              {categories.map((cat) => {
-                const percent = cycleTotalSpent > 0 ? (cat.total / cycleTotalSpent) * 100 : 0;
+              {categoryGroups.map((cat) => {
+                const percent = activeTotalSpent > 0 ? (cat.total / activeTotalSpent) * 100 : 0;
                 const isExpanded = expandedCategory === cat.name;
-                const catExpenses = isExpanded ? getCategoryExpenses(cat.name) : [];
 
                 return (
                   <div
@@ -196,22 +296,24 @@ export default function AnalyticsModal({ isOpen, onClose, metrics, isDark, expen
                       </div>
                     </button>
 
-                    {/* Accordion: Expenses in this category over the last 30 days */}
+                    {/* Accordion: Full List of items matching cat.total 100% */}
                     {isExpanded && (
                       <div className={`border-t px-3.5 py-3 space-y-2 animate-fade-in ${
                         isDark ? 'border-neutral-800 bg-neutral-900/60' : 'border-neutral-200/60 bg-white/80'
                       }`}>
                         <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-neutral-500 pb-0.5">
-                          <span>Son 1 Aydaki Harcamalar</span>
-                          <span className="num-tabular">{catExpenses.length} Kayıt</span>
+                          <span>
+                            {activeTab === 'period' ? 'Bu Dönemdeki Harcamalar' : 'Tüm Zamanlardaki Harcamalar'}
+                          </span>
+                          <span className="num-tabular">{cat.items.length} Kayıt</span>
                         </div>
-                        {catExpenses.length === 0 ? (
+                        {cat.items.length === 0 ? (
                           <p className={`text-xs py-2 text-center ${isDark ? 'text-neutral-500' : 'text-neutral-400'}`}>
-                            Bu kategoride son 30 günde harcama kaydı yok.
+                            Bu kategoride harcama kaydı yok.
                           </p>
                         ) : (
-                          <div className="space-y-1.5 max-h-48 overflow-y-auto no-scrollbar">
-                            {catExpenses.map((exp) => (
+                          <div className="space-y-1.5 max-h-52 overflow-y-auto no-scrollbar">
+                            {cat.items.map((exp) => (
                               <div
                                 key={exp.id || exp.timestamp}
                                 className={`flex items-center justify-between p-2.5 rounded-xl text-xs ${

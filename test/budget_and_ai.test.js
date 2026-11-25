@@ -378,6 +378,71 @@ describe('Budget Financial Engine & Date Calculations', () => {
     assert.equal(formatCurrency(220, true), '220 ₺');
     assert.equal(formatCurrency(60, true), '60 ₺');
   });
+
+  test('Today net deduction: user spent 450 TL today, updates remaining balance to 10.000 TL with 10 days left -> dailyAllowance 1000 TL, todayNet 550 TL', () => {
+    // Target date: Nov 10, 10 days left until Nov 20
+    const targetDate = new Date(2026, 10, 10, 14, 0);
+    const todayStr = getTodayString(targetDate, 6);
+
+    // User already spent 450 TL today:
+    const expenses = [
+      { id: 1, title: 'Öğle Yemeği', amount: 350, category: 'Yemek & Restoran', date: todayStr, timestamp: new Date(2026, 10, 10, 12, 0).getTime() },
+      { id: 2, title: 'Kahve', amount: 100, category: 'Kahve & Kafe', date: todayStr, timestamp: new Date(2026, 10, 10, 13, 0).getTime() }
+    ];
+
+    // User adjusts remaining balance in bank to 10.000 TL:
+    const metrics = computeBudgetMetrics({
+      expenses,
+      monthlyIncome: 28000,
+      salaryDay: 20,
+      currentBalance: 10000,
+      balanceSetDate: todayStr,
+      balanceCheckpoints: [
+        { date: '2026-11-04', balance: 7500 },
+        { date: todayStr, balance: 10000 }
+      ],
+      targetDate,
+      resetHour: 6
+    });
+
+    // 10 days remaining (Nov 10 to Nov 19 inclusive)
+    assert.equal(metrics.daysLeftInPeriod, 10);
+    assert.equal(metrics.dailyAllowance, 1000); // 10.000 / 10
+    assert.equal(metrics.todayTotalSpent, 450); // 350 + 100
+    assert.equal(metrics.todayNet, 550); // 1000 - 450 = +550 TL left today!
+    assert.equal(metrics.isTodaySurplus, true);
+  });
+
+  test('Historical calendar stability across cycles: setting new balance in new cycle preserves Nov 4-19 historical allowances', () => {
+    const expenses = [
+      { id: 1, title: 'Harcama Nov 4', amount: 200, category: 'Diğer', date: '2026-11-04', timestamp: new Date(2026, 10, 4, 12, 0).getTime() },
+      { id: 2, title: 'Harcama Nov 21', amount: 500, category: 'Diğer', date: '2026-11-21', timestamp: new Date(2026, 10, 21, 12, 0).getTime() }
+    ];
+
+    const checkpoints = [
+      { date: '2026-11-04', balance: 7500 },
+      { date: '2026-11-25', balance: 15000 }
+    ];
+
+    const history = computeDailyHistory({
+      expenses,
+      salaryDay: 20,
+      currentBalance: 15000,
+      balanceSetDate: '2026-11-25',
+      balanceCheckpoints: checkpoints,
+      targetDate: new Date(2026, 10, 25, 12, 0),
+      resetHour: 6,
+      daysCount: 25,
+      minDate: '2026-11-04'
+    });
+
+    const dayNov4 = history.find(h => h.dateStr === '2026-11-04');
+    assert.ok(dayNov4);
+    // Nov 4 MUST still be 468.75 TL, completely unaffected by Nov 25 balance update:
+    assert.equal(dayNov4.dailyAllowance, 468.75);
+    assert.equal(dayNov4.totalSpent, 200);
+    assert.equal(dayNov4.net, 268.75);
+  });
 });
 
 describe('Smart Client-Side AI Categorization Engine', () => {

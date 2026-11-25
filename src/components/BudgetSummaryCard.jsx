@@ -106,7 +106,7 @@ export default function BudgetSummaryCard({ metrics, isDark }) {
           </span>
           <span>
             {isBalanceActive ? (
-              `20 Kasım'a ${daysLeftInPeriod} gün kaldı`
+              `${cycle.endLabel}'a ${daysLeftInPeriod} gün kaldı`
             ) : (
               `${cycle.startLabel} – ${cycle.endLabel} (${cycle.remainingDays} gün)`
             )}

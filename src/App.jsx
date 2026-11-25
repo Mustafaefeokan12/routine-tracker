@@ -221,7 +221,20 @@ export default function App() {
     }
   };
 
-  // 4. Delete Expense
+  // 4. Add Past Day Expense (from History Calendar Modal)
+  const handleAddPastExpense = async (expData) => {
+    const timestamp = expData.timestamp || new Date(expData.date + 'T12:00:00').getTime();
+    const newExp = {
+      ...expData,
+      timestamp
+    };
+    const id = await db.expenses.add(newExp);
+    const saved = { ...newExp, id };
+    setExpenses((prev) => [saved, ...prev]);
+    setLastExpense(saved);
+  };
+
+  // 5. Delete Expense
   const handleDeleteExpense = async (id) => {
     await db.expenses.delete(id);
     setExpenses((prev) => prev.filter((e) => e.id !== id));
@@ -230,14 +243,14 @@ export default function App() {
     }
   };
 
-  // 5. Undo Last Expense
+  // 6. Undo Last Expense
   const handleUndo = async (id) => {
     await db.expenses.delete(id);
     setExpenses((prev) => prev.filter((e) => e.id !== id));
     setLastExpense(null);
   };
 
-  // 6. Update Settings
+  // 7. Update Settings
   const handleUpdateSetting = async (key, value) => {
     await setSetting(key, value);
     setSettings((prev) => ({ ...prev, [key]: value }));
@@ -330,6 +343,8 @@ export default function App() {
         onClose={() => setIsHistoryOpen(false)}
         history={history}
         isDark={isDark}
+        onAddPastExpense={handleAddPastExpense}
+        onDeleteExpense={handleDeleteExpense}
       />
 
       {/* Analytics Modal */}

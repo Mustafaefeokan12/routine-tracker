@@ -1,4 +1,4 @@
-const CACHE_NAME = 'budget-v1.9';
+const CACHE_NAME = 'budget-v2.0';
 const STATIC_ASSETS = [
   './',
   './index.html',

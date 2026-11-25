@@ -331,9 +331,27 @@ export function computeDailyHistory({
     // Dynamic historical allowance for this specific day based on checkpoint active on that day
     let dayAllowance = dailyAllowance;
 
-    if (salaryDay && (currentBalance > 0 || (monthlyIncome !== null && monthlyIncome > 0))) {
+    if (dateStr === todayStr && dailyAllowance > 0) {
+      dayAllowance = dailyAllowance;
+    } else if (salaryDay && (currentBalance > 0 || (monthlyIncome !== null && monthlyIncome > 0))) {
       const cycleOnDay = getSalaryCycle(salaryDay, d, resetHour);
-      const activeCp = getActiveCheckpoint(dateStr, effectiveCheckpoints, currentBalance || 7500);
+      const cycleStartStr = getTodayString(cycleOnDay.startDate, 0);
+
+      // Find active checkpoint for this specific day
+      let activeCp = null;
+      const relevantCps = effectiveCheckpoints.filter((cp) => cp.date <= dateStr);
+      if (relevantCps.length > 0) {
+        activeCp = relevantCps[relevantCps.length - 1];
+      }
+
+      // If no checkpoint found on or before this day in this cycle:
+      if (!activeCp || (activeCp.date < cycleStartStr && cycleStartStr >= '2026-11-20')) {
+        // We are in a new cycle (e.g. Nov 20+) and no checkpoint has been set yet in this cycle
+        activeCp = { date: cycleStartStr, balance: monthlyIncome };
+      } else if (!activeCp) {
+        // Initial Nov 4-19 period fallback
+        activeCp = { date: '2026-11-04', balance: 7500 };
+      }
 
       const dMidnight = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
       const nextSalaryMidnight = new Date(cycleOnDay.endDate.getFullYear(), cycleOnDay.endDate.getMonth(), cycleOnDay.endDate.getDate() + 1, 0, 0, 0, 0);
