@@ -443,6 +443,47 @@ describe('Budget Financial Engine & Date Calculations', () => {
     assert.equal(dayNov4.totalSpent, 200);
     assert.equal(dayNov4.net, 268.75);
   });
+
+  test('User scenario: 350+150+450+120+30 TL spent today, then balance updated to 24528 TL -> todayTotalSpent is 1100, todayNet is -78, cyclePercentSpent > 0', () => {
+    const targetDate = new Date(2026, 10, 26, 14, 0); // Nov 26 (24 days left until Dec 20)
+    const todayStr = getTodayString(targetDate, 6);
+
+    // 5 expenses made today totaling 1100 TL:
+    const expenses = [
+      { id: 1, title: 'Yemek 1', amount: 350, date: todayStr, timestamp: new Date(2026, 10, 26, 10, 0).getTime() },
+      { id: 2, title: 'Yemek 2', amount: 150, date: todayStr, timestamp: new Date(2026, 10, 26, 11, 0).getTime() },
+      { id: 3, title: 'Alışveriş', amount: 450, date: todayStr, timestamp: new Date(2026, 10, 26, 12, 0).getTime() },
+      { id: 4, title: 'Kahve', amount: 120, date: todayStr, timestamp: new Date(2026, 10, 26, 13, 0).getTime() },
+      { id: 5, title: 'Atıştırmalık', amount: 30, date: todayStr, timestamp: new Date(2026, 10, 26, 13, 30).getTime() }
+    ];
+
+    // User updates balance to 24.528 TL at 14:00 (after making the expenses):
+    const metrics = computeBudgetMetrics({
+      expenses,
+      monthlyIncome: 28000,
+      salaryDay: 20,
+      currentBalance: 24528,
+      balanceSetDate: todayStr,
+      balanceSetTimestamp: new Date(2026, 10, 26, 14, 0).getTime(),
+      balanceCheckpoints: [
+        { date: '2026-11-04', balance: 7500 },
+        { date: todayStr, balance: 24528, timestamp: new Date(2026, 10, 26, 14, 0).getTime() }
+      ],
+      targetDate,
+      resetHour: 6
+    });
+
+    // 24 days left (Nov 26 to Dec 19 inclusive) -> 24528 / 24 = 1022 TL
+    assert.equal(metrics.daysLeftInPeriod, 24);
+    assert.equal(metrics.dailyAllowance, 1022);
+    // Today's total spent MUST be 1100 TL (NOT 0 TL!):
+    assert.equal(metrics.todayTotalSpent, 1100);
+    // Today's net MUST be 1022 - 1100 = -78 TL (NOT +1022 TL!):
+    assert.equal(metrics.todayNet, -78);
+    assert.equal(metrics.isTodaySurplus, false);
+    // Cycle percent spent MUST be > 0 (NOT 0%!):
+    assert.ok(metrics.cyclePercentSpent > 0);
+  });
 });
 
 describe('Smart Client-Side AI Categorization Engine', () => {

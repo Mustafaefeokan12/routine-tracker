@@ -170,8 +170,6 @@ export function computeBudgetMetrics({
 
   let cycleTotalSpent = 0;
   let todayTotalSpent = 0;
-  let todayActiveSpent = 0;
-  let periodSpentSinceBalanceSet = 0;
   let pastExpensesBeforeToday = 0;
   const categoryTotals = {};
 
@@ -191,11 +189,6 @@ export function computeBudgetMetrics({
       }
       categoryTotals[catName].total += amount;
       categoryTotals[catName].count += 1;
-
-      // Track spending specifically since balance was set
-      if (balanceSetTs > 0 && expTs >= balanceSetTs) {
-        periodSpentSinceBalanceSet += amount;
-      }
     }
 
     // Past expenses in the active cycle made before today
@@ -209,16 +202,9 @@ export function computeBudgetMetrics({
       }
     }
 
-    // Check if spent today (based on logical date)
+    // Check if spent today (based on logical date) - ALL expenses today are counted
     if (expDateStr === todayStr) {
       todayTotalSpent += amount;
-      if (isBalanceActive && activeCp && activeCp.date === todayStr && balanceSetTs > 0) {
-        if (expTs >= balanceSetTs) {
-          todayActiveSpent += amount;
-        }
-      } else {
-        todayActiveSpent += amount;
-      }
     }
   }
 
@@ -231,14 +217,16 @@ export function computeBudgetMetrics({
   const dailyAllowance = daysLeftInPeriod > 0 ? (remainingAtStartOfToday / daysLeftInPeriod) : 0;
 
   // 3. Today's net status (+ is under budget/karda, - is over budget/aşma)
-  const todayNet = dailyAllowance - todayActiveSpent;
+  // Today's expenses are always subtracted from today's daily allowance!
+  const todayNet = dailyAllowance - todayTotalSpent;
   const isTodaySurplus = todayNet >= 0;
 
-  // 4. Overall remaining budget across the period
-  const totalSpentInPeriod = pastExpensesBeforeToday + todayActiveSpent;
+  // 4. Overall remaining budget across the period and percent spent
+  const totalSpentInPeriod = pastExpensesBeforeToday + todayTotalSpent;
   const cycleRemaining = Math.max(0, effectiveStartingBudget - totalSpentInPeriod);
-  const cyclePercentSpent = effectiveStartingBudget > 0
-    ? Math.min(100, Math.max(0, (totalSpentInPeriod / effectiveStartingBudget) * 100))
+  const totalCycleBudget = (cycleRemaining + cycleTotalSpent) > 0 ? (cycleRemaining + cycleTotalSpent) : (monthlyIncome || effectiveStartingBudget);
+  const cyclePercentSpent = totalCycleBudget > 0
+    ? Math.min(100, Math.max(0, (cycleTotalSpent / totalCycleBudget) * 100))
     : 0;
 
   // Average spent per day elapsed in cycle
@@ -256,11 +244,11 @@ export function computeBudgetMetrics({
     remainingAtStartOfToday,
     dailyAllowance,
     todayTotalSpent,
-    todayActiveSpent,
+    todayActiveSpent: todayTotalSpent,
     todayNet,
     isTodaySurplus,
     cycleTotalSpent, // Real total of all cycle expenses
-    periodSpentSinceBalanceSet,
+    periodSpentSinceBalanceSet: cycleTotalSpent,
     allCycleSpent: cycleTotalSpent,
     cycleRemaining,
     cyclePercentSpent,

@@ -7,6 +7,7 @@ export default function BudgetSummaryCard({ metrics, isDark }) {
 
   const {
     dailyAllowance = 0,
+    todayTotalSpent = 0,
     todayNet = 0,
     isTodaySurplus = true,
     cycleRemaining = 0,
@@ -37,6 +38,18 @@ export default function BudgetSummaryCard({ metrics, isDark }) {
               {isTodaySurplus ? '+' : ''}
               {formatCurrency(todayNet, true)}
             </span>
+          </div>
+          <div className={`text-[11px] font-medium mt-1 flex items-center gap-1.5 ${
+            isDark ? 'text-neutral-400' : 'text-neutral-500'
+          }`}>
+            <span>Bugün Harcanan:</span>
+            <strong className={`num-tabular font-bold ${
+              todayTotalSpent > 0
+                ? isDark ? 'text-rose-400' : 'text-rose-600'
+                : isDark ? 'text-neutral-300' : 'text-neutral-700'
+            }`}>
+              {formatCurrency(todayTotalSpent, true)}
+            </strong>
           </div>
         </div>
 
