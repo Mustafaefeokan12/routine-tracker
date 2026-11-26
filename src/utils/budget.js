@@ -241,9 +241,32 @@ export function computeBudgetMetrics({
   const todayNet = dailyAllowance - todayTotalSpent;
   const isTodaySurplus = todayNet >= 0;
 
-  // 4. Overall remaining budget across the period and percent spent
-  const totalSpentInPeriod = pastExpensesBeforeToday + todayTotalSpent;
-  const cycleRemaining = Math.max(0, effectiveStartingBudget - totalSpentInPeriod);
+  // 4. Overall remaining budget across the period
+  let cycleRemaining = effectiveStartingBudget;
+  if (isBalanceActive && activeCp) {
+    if (activeCp.date === todayStr) {
+      // Balance was synced today: remaining cash in bank is the synced balance minus any expenses made AFTER syncing
+      let spentAfterSync = 0;
+      if (balanceSetTs > 0) {
+        for (const exp of expenses) {
+          const expTs = exp.timestamp || new Date(exp.date).getTime();
+          const expDate = exp.date || getTodayString(new Date(expTs), resetHour);
+          if (expDate === todayStr && expTs > balanceSetTs) {
+            spentAfterSync += (Number(exp.amount) || 0);
+          }
+        }
+      }
+      cycleRemaining = Math.max(0, effectiveStartingBudget - spentAfterSync);
+    } else {
+      // Balance was set on a previous day: subtract past expenses since then and today's expenses
+      const totalSpentInPeriod = pastExpensesBeforeToday + todayTotalSpent;
+      cycleRemaining = Math.max(0, effectiveStartingBudget - totalSpentInPeriod);
+    }
+  } else {
+    // Normal cycle with monthly income
+    cycleRemaining = Math.max(0, monthlyIncome - cycleTotalSpent);
+  }
+
   const totalCycleBudget = (cycleRemaining + cycleTotalSpent) > 0 ? (cycleRemaining + cycleTotalSpent) : (monthlyIncome || effectiveStartingBudget);
   const cyclePercentSpent = totalCycleBudget > 0
     ? Math.min(100, Math.max(0, (cycleTotalSpent / totalCycleBudget) * 100))

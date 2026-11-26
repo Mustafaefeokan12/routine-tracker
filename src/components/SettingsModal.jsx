@@ -50,9 +50,10 @@ export default function SettingsModal({
     return updated;
   };
 
-  const handleSyncBankBalance = () => {
-    const val = Number(currentBalance);
-    if (isNaN(val)) return;
+  const handleSyncBankBalance = async () => {
+    const cleanStr = String(currentBalance || '').replace(/\D/g, '');
+    const val = Number(cleanStr);
+    if (isNaN(val) || val < 0) return;
     triggerHaptic('success');
     soundEngine.playSuccess();
     const todayStr = getTodayString(new Date(), 6);
@@ -70,9 +71,11 @@ export default function SettingsModal({
     };
 
     if (onUpdateSettings) {
-      onUpdateSettings(updates);
+      await onUpdateSettings(updates);
     } else if (onUpdateSetting) {
-      Object.entries(updates).forEach(([k, v]) => onUpdateSetting(k, v));
+      for (const [k, v] of Object.entries(updates)) {
+        await onUpdateSetting(k, v);
+      }
     }
 
     setIsSynced(true);
@@ -230,6 +233,12 @@ export default function SettingsModal({
                     onChange={(e) => {
                       setCurrentBalance(e.target.value.replace(/\D/g, ''));
                       setIsSynced(false);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSyncBankBalance();
+                      }
                     }}
                     placeholder="Örn: 7500"
                     className={`flex-1 px-3.5 py-2.5 rounded-xl text-sm font-bold num-tabular outline-none ${
