@@ -484,6 +484,27 @@ describe('Budget Financial Engine & Date Calculations', () => {
     // Cycle percent spent MUST be > 0 (NOT 0%!):
     assert.ok(metrics.cyclePercentSpent > 0);
   });
+
+  test('Sync bank balance: updates currentBalance to 20000 TL even with old seed checkpoints [{ date: "2026-11-04", balance: 7500 }]', () => {
+    const targetDate = new Date(2026, 10, 26, 4, 32); // 04:32 AM
+    const todayStr = getTodayString(targetDate, 6);
+
+    const metrics = computeBudgetMetrics({
+      expenses: [],
+      monthlyIncome: 28000,
+      salaryDay: 20,
+      currentBalance: 20000,
+      balanceSetDate: todayStr,
+      balanceCheckpoints: [{ date: '2026-11-04', balance: 7500 }],
+      targetDate,
+      resetHour: 6
+    });
+
+    assert.equal(metrics.isBalanceActive, true);
+    assert.equal(metrics.monthlyIncome, 20000); // MUST be 20000, NOT 7500 or 28000!
+    assert.equal(metrics.cycleRemaining, 20000);
+    assert.equal(metrics.dailyAllowance, 20000 / metrics.daysLeftInPeriod);
+  });
 });
 
 describe('Smart Client-Side AI Categorization Engine', () => {

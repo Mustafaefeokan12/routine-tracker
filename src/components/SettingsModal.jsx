@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Moon, Sun, Monitor, Bell, Download, Trash2, Check, Settings as SettingsIcon } from 'lucide-react';
 import { triggerHaptic, soundEngine } from '../utils/haptics';
 import { exportAllData, clearAllExpenses } from '../db';
@@ -9,6 +9,7 @@ export default function SettingsModal({
   onClose,
   settings,
   onUpdateSetting,
+  onUpdateSettings,
   onDataReset,
   isDark
 }) {
@@ -20,6 +21,16 @@ export default function SettingsModal({
   const [notificationEnabled, setNotificationEnabled] = useState(!!settings.dailyNotification);
   const [showConfirmReset, setShowConfirmReset] = useState(false);
   const [isSynced, setIsSynced] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setIncome(settings.monthlyIncome?.toString() || '28000');
+      setSalaryDay(settings.salaryDay?.toString() || '20');
+      setIqosPrice(settings.iqosPrice?.toString() || '220');
+      setCurrentBalance(settings.currentBalance?.toString() || '7500');
+      setIsSynced(false);
+    }
+  }, [isOpen, settings]);
 
   if (!isOpen) return null;
 
@@ -48,32 +59,52 @@ export default function SettingsModal({
     const now = Date.now();
     const updatedCps = updateCheckpointsList(val, todayStr, now);
 
-    onUpdateSetting('currentBalance', val);
-    onUpdateSetting('balanceSetDate', todayStr);
-    onUpdateSetting('balanceSetTimestamp', now);
-    onUpdateSetting('balanceCheckpoints', updatedCps);
+    const updates = {
+      currentBalance: val,
+      balanceSetDate: todayStr,
+      balanceSetTimestamp: now,
+      balanceCheckpoints: updatedCps,
+      monthlyIncome: Number(income) || 28000,
+      salaryDay: Math.min(31, Math.max(1, Number(salaryDay) || 20)),
+      iqosPrice: Number(iqosPrice) || 220
+    };
+
+    if (onUpdateSettings) {
+      onUpdateSettings(updates);
+    } else if (onUpdateSetting) {
+      Object.entries(updates).forEach(([k, v]) => onUpdateSetting(k, v));
+    }
+
     setIsSynced(true);
-    setTimeout(() => setIsSynced(false), 3000);
+    setTimeout(() => {
+      onClose();
+    }, 450);
   };
 
   const handleSaveFinancials = () => {
     triggerHaptic('success');
     soundEngine.playSuccess();
     const newBalance = Number(currentBalance);
-    const isBalanceChanged = newBalance !== Number(settings.currentBalance);
     const todayStr = getTodayString(new Date(), 6);
     const now = Date.now();
+    const updatedCps = updateCheckpointsList(newBalance, todayStr, now);
 
-    onUpdateSetting('monthlyIncome', Number(income) || 28000);
-    onUpdateSetting('salaryDay', Math.min(31, Math.max(1, Number(salaryDay) || 20)));
-    onUpdateSetting('iqosPrice', Number(iqosPrice) || 220);
-    onUpdateSetting('currentBalance', newBalance);
-    if (isBalanceChanged) {
-      const updatedCps = updateCheckpointsList(newBalance, todayStr, now);
-      onUpdateSetting('balanceSetDate', todayStr);
-      onUpdateSetting('balanceSetTimestamp', now);
-      onUpdateSetting('balanceCheckpoints', updatedCps);
+    const updates = {
+      monthlyIncome: Number(income) || 28000,
+      salaryDay: Math.min(31, Math.max(1, Number(salaryDay) || 20)),
+      iqosPrice: Number(iqosPrice) || 220,
+      currentBalance: newBalance,
+      balanceSetDate: todayStr,
+      balanceSetTimestamp: now,
+      balanceCheckpoints: updatedCps
+    };
+
+    if (onUpdateSettings) {
+      onUpdateSettings(updates);
+    } else if (onUpdateSetting) {
+      Object.entries(updates).forEach(([k, v]) => onUpdateSetting(k, v));
     }
+
     onClose();
   };
 

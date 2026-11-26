@@ -129,16 +129,17 @@ export function computeBudgetMetrics({
   const cycleEndTs = cycle.endDate.getTime();
 
   const todayStr = getTodayString(targetDate, resetHour);
-
-  const balanceSetDateObj = balanceSetDate ? new Date(balanceSetDate + 'T00:00:00') : null;
+  const cycleStartStr = getTodayString(cycle.startDate, 0);
+  const cycleEndStr = getTodayString(cycle.endDate, 0);
 
   // Determine if mid-cycle balance override is active:
+  // Active if currentBalance > 0 and was set in this cycle or initial Nov 4-19 period
   const isBalanceActive = Boolean(
-    currentBalance > 0 &&
-    balanceSetDateObj &&
-    balanceSetDateObj >= cycle.startDate &&
-    logicalDate >= balanceSetDateObj &&
-    logicalDate <= cycle.endDate
+    currentBalance > 0 && (
+      (balanceSetDate && balanceSetDate >= cycleStartStr && balanceSetDate <= cycleEndStr) ||
+      (Array.isArray(balanceCheckpoints) && balanceCheckpoints.some((cp) => cp.date >= cycleStartStr && cp.date <= cycleEndStr)) ||
+      (balanceSetDate === '2026-11-04' && todayStr < '2026-11-20')
+    )
   );
 
   let effectiveStartingBudget = monthlyIncome;
@@ -149,15 +150,34 @@ export function computeBudgetMetrics({
       ? [...balanceCheckpoints]
       : [];
 
+    // Ensure current balance and its set date are registered in checkpoints
+    const effectiveSetDate = balanceSetDate || todayStr;
+    if (currentBalance > 0) {
+      const existingIdx = effectiveCheckpoints.findIndex((cp) => cp.date === effectiveSetDate);
+      if (existingIdx >= 0) {
+        effectiveCheckpoints[existingIdx] = {
+          date: effectiveSetDate,
+          balance: currentBalance,
+          timestamp: balanceSetTimestamp
+        };
+      } else {
+        effectiveCheckpoints.push({
+          date: effectiveSetDate,
+          balance: currentBalance,
+          timestamp: balanceSetTimestamp
+        });
+      }
+      effectiveCheckpoints.sort((a, b) => a.date.localeCompare(b.date));
+    }
+
     if (effectiveCheckpoints.length === 0) {
       effectiveCheckpoints.push({ date: '2026-11-04', balance: 7500 });
-      if (balanceSetDate && balanceSetDate !== '2026-11-04') {
-        effectiveCheckpoints.push({ date: balanceSetDate, balance: currentBalance, timestamp: balanceSetTimestamp });
-      }
     }
 
     activeCp = getActiveCheckpoint(todayStr, effectiveCheckpoints, currentBalance || 7500);
-    effectiveStartingBudget = activeCp.balance;
+    effectiveStartingBudget = (activeCp && typeof activeCp.balance === 'number')
+      ? activeCp.balance
+      : currentBalance;
   }
 
   const balanceSetTs = (activeCp && activeCp.timestamp) || (activeCp && activeCp.date ? new Date(activeCp.date + 'T00:00:00').getTime() : 0);
@@ -293,11 +313,20 @@ export function computeDailyHistory({
     ? [...balanceCheckpoints]
     : [];
 
+  // Always register current balance and set date into checkpoints
+  const effectiveSetDate = balanceSetDate || todayStr;
+  if (currentBalance > 0) {
+    const existingIdx = effectiveCheckpoints.findIndex((cp) => cp.date === effectiveSetDate);
+    if (existingIdx >= 0) {
+      effectiveCheckpoints[existingIdx] = { date: effectiveSetDate, balance: currentBalance };
+    } else {
+      effectiveCheckpoints.push({ date: effectiveSetDate, balance: currentBalance });
+    }
+    effectiveCheckpoints.sort((a, b) => a.date.localeCompare(b.date));
+  }
+
   if (effectiveCheckpoints.length === 0) {
     effectiveCheckpoints.push({ date: '2026-11-04', balance: 7500 });
-    if (currentBalance > 0 && balanceSetDate && balanceSetDate !== '2026-11-04') {
-      effectiveCheckpoints.push({ date: balanceSetDate, balance: currentBalance });
-    }
   }
 
   const history = [];

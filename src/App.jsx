@@ -256,6 +256,14 @@ export default function App() {
     setSettings((prev) => ({ ...prev, [key]: value }));
   };
 
+  // 8. Update Multiple Settings Atomically
+  const handleUpdateSettings = async (updates) => {
+    for (const [key, value] of Object.entries(updates)) {
+      await setSetting(key, value);
+    }
+    setSettings((prev) => ({ ...prev, ...updates }));
+  };
+
   return (
     <div
       className={`min-h-screen transition-colors duration-200 select-none pb-24 ${
@@ -362,6 +370,7 @@ export default function App() {
         onClose={() => setIsSettingsOpen(false)}
         settings={settings}
         onUpdateSetting={handleUpdateSetting}
+        onUpdateSettings={handleUpdateSettings}
         onDataReset={() => {
           setExpenses([]);
           setLastExpense(null);
